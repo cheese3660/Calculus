@@ -20,9 +20,11 @@
                 cmake
                 pkg-config
             ];
-            shellHook = ''
-                echo "Entered Calculus development environment";
-            '';
+
+            packages = with pkgs; [
+                clang-tools
+                gdb
+            ];
         };
     };
 }
