@@ -1,5 +1,5 @@
 {
-    description = "The development environment for the Calculus package manager (on NixOS for now)"
+    description = "The development environment for the Calculus package manager (on NixOS for now)";
 
     inputs = {
         nixpkgs.url = "nixpkgs/nixos-26.05";
@@ -12,16 +12,17 @@
     in
     {
         devShells.${system}.default = pkgs.mkShell {
-
+            name = "calculus";
             buildInputs = with pkgs; [
                 git
                 gcc
-                nim
-                lua
+                lua5_5
+                cmake
+                pkg-config
             ];
             shellHook = ''
                 echo "Entered Calculus development environment";
-            ''
+            '';
         };
     };
 }
