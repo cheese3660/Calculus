@@ -1,0 +1,61 @@
+SCALCULUS ARCHIVE (CAR)
+
+a car file is an uncompressed (because it needs to have it's hash calculated prior to compression, and will be sent over the wire using zlib otherwise) minimal representation of an entire directory
+
+in essence it's the following with everything sorted using strcmp at each level
+
+./
+    a.txt
+    b.txt
+    c/
+        d.txt
+        e.txt
+        f/
+            g.txt
+    h/
+        i.txt
+        j.txt
+
+->
+./a.txt
+./b.txt
+./c/ <-- all this will hold is permissions
+# Depth first search
+./c/d.txt
+./c/e.txt
+./c/f/
+./c/f/g.txt
+./h/
+./h/i.txt
+./h/j.txt
+
+
+This needs to be able to have a hash calculated w/o actually making the archive which is why it has the somewhat weird structure
+
+CAR files start with
+
+0x67 0x65 0x82 0x00 "CAR\0"
+
+then are followed by 1 or more CAR entries which are basically the following
+
+uint8_t name[];  // A null terminated name keeping the leading ./ and keeping every `/` thereafter
+                 // A name of length 0 signals the end of the archive
+uint8_t attr;    // A value of the following
+                 // SDF--RWX
+                 // 76543210
+                 // Where S is set if this is a symlink
+                 //       D is set if this is a directory
+                 //       F is set if this is a regular file
+                 //       - is reserved
+                 //       - is reserved
+                 //       R is set if this file is readable   (uses the owner permissions, will get splatted out, is the `lstat` for symlinks)
+                 //       W is set if this file is writeable  (uses the owner permissions, will get splatted out, is the `lstat` for symlinks)
+                 //       X is set if this file is executable (uses the owner permissions, will get splatted out, is the `lstat` for symlinks)
+
+
+Then followed by if this is a regular file
+uint64_t file_length // In little endian
+uint8_t data[file_length]
+
+Or if this is a symlink
+uint8_t target[]; // A null terminated symlink target
