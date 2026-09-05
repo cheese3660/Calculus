@@ -18,7 +18,6 @@ void usage(void)
     fprintf(stderr, "    -A <out>    Archive <path> to <out>\n");
     fprintf(stderr, "    -x          Extract <path> to the cwd\n");
     fprintf(stderr, "    -X <out>    Extract <path> into <out>, creating it if it doesn't exist\n");
-    fprintf(stderr, "    -t          Create a tree diagram of <path>\n");
     fprintf(stderr, "    -H          Print the sha256 sum of <path>\n");
     fprintf(stderr, "    -h          Print this message to stderr and quit\n");
 }
@@ -50,8 +49,7 @@ typedef enum
     MODE_UNKNOWN,
     MODE_ARCHIVE,
     MODE_EXTRACT,
-    MODE_HASH,
-    MODE_TREE
+    MODE_HASH
 } car_mode_t;
 
 static void hash(const char *path)
@@ -119,7 +117,7 @@ int main(int argc, char **argv)
     const char *out_file = "out.car";
     const char *out_dir = ".";
     const char *path;
-    const char *opts = "aA:xX:tHh";
+    const char *opts = "aA:xX:Hh";
     for (int opt = getopt(argc, argv, opts); opt != -1; opt = getopt(argc, argv, opts))
     {
         switch (opt)
@@ -143,9 +141,6 @@ int main(int argc, char **argv)
             [[fallthrough]];
         case 'x':
             mode = MODE_EXTRACT;
-            break;
-        case 't':
-            mode = MODE_TREE;
             break;
         case 'H':
             mode = MODE_HASH;
@@ -174,9 +169,6 @@ int main(int argc, char **argv)
         break;
     case MODE_EXTRACT:
         extract(path, out_dir);
-        break;
-    case MODE_TREE:
-        panic("NOT IMPLEMENTED");
         break;
     case MODE_HASH:
         hash(path);
