@@ -19,6 +19,7 @@
                 lua5_5
                 cmake
                 pkg-config
+                libgit2
             ];
 
             packages = with pkgs; [
