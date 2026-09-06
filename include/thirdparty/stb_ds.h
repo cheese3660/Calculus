@@ -3,6 +3,9 @@
 #ifndef INCLUDE_STB_DS_H
 #define INCLUDE_STB_DS_H
 
+#pragma GCC system_header
+
+
 #include <stdlib.h>
 #include <stddef.h>
 #include <string.h>
@@ -127,7 +130,7 @@ extern void * stbds_shmode_func(size_t elemsize, int mode);
 #define stbds_arrpush         stbds_arrput  // synonym
 #define stbds_arraddn(a,n)    (stbds_arrmaybegrow(a,n), stbds_header(a)->length += (n))
 #define stbds_arrlast(a)      ((a)[stbds_header(a)->length-1])
-#define stbds_arrfree(a)      ((void) ((a) ? realloc(stbds_header(a),0) : 0), (a)=NULL)
+#define stbds_arrfree(a)      ((void) ((a) ? free(stbds_header(a)) : 0), (a)=NULL)
 #define stbds_arrdel(a,i)     stbds_arrdeln(a,i,1)
 #define stbds_arrdeln(a,i,n)  (memmove(&(a)[i], &(a)[(i)+(n)], sizeof *(a) * (stbds_header(a)->length-(n)-(i))), stbds_header(a)->length -= (n))
 #define stbds_arrdelswap(a,i) ((a)[i] = stbds_arrlast(a), stbds_header(a)->length -= 1)
@@ -709,7 +712,7 @@ void * stbds_hmput_default(void *a, size_t elemsize)
 }
 
 static char *stbds_strdup(char *str);
-static char *stbds_string_arena_alloc(stbds_string_arena *a, char *str);
+// static char *stbds_string_arena_alloc(stbds_string_arena *a, char *str);
 
 void *stbds_hmput_key(void *a, size_t elemsize, void *key, size_t keysize, int mode)
 {

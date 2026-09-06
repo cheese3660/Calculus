@@ -13,8 +13,14 @@ pkg_check_modules(LUA REQUIRED lua)
 
 add_executable(calculus 
     src/calculus_main.c
+    
     src/common/crypto.c
     src/common/archive.c # Used for moving stuff between stores/caches
+    src/common/command.c
+
+    src/calculus/luaenv.c
+    
+    src/thirdparty/stb_ds.c
 )
 
 add_executable(car

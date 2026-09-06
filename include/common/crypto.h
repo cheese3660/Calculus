@@ -47,6 +47,8 @@ typedef struct {
 /// @param len The length of the data to ingest
 void sha256_append(sha256_ingest_t* to_ingest, const void* data, size_t len);
 
+#define sha256_appends(to_ingest, str) sha256_append(to_ingest, str, strlen(str))
+
 /// @brief Append a file to an in progress ingest
 /// @param to_ingest The in progress ingest, should be zero initialized to start
 /// @param file The file to read the contents of and append

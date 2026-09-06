@@ -7,6 +7,8 @@
 #include <lua.h>
 #include <stdio.h>
 #include "common/crypto.h"
+#include "calculus/luaenv.h"
+#include <stdlib.h>
 
 #define SHA256(X)                                            \
     do                                                       \
@@ -15,13 +17,15 @@
         printf("SHA256('" X "') = %s\n", sha256_to_hex(&x)); \
     } while (0)
 
-int main()
+int main(int argc, const char** argv)
 {
-    SHA256("");
-    SHA256("abc");
-    SHA256("hello world");
-    SHA256("foobar");
+    if (argc != 2)
+    {
+        fprintf(stderr, "Incorrect argument count\n");
+        exit(EXIT_FAILURE);
+    }
 
-    SHA256("0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF0123456");
-    SHA256("0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF01234567");
+    env_setup();
+    env_run(argv[1]);
+    env_teardown();
 }
