@@ -179,9 +179,7 @@ static int import(lua_State *L)
     }
 
     if (import_cache == nullptr)
-    {
         sh_new_arena(import_cache);
-    }
 
     int index = shgeti(import_cache, path);
     int reg_ref;
@@ -194,7 +192,6 @@ static int import(lua_State *L)
 
         // stack [..., block]
         int before_top = lua_gettop(L) - 1;
-
         if (lua_pcall(L, 0, LUA_MULTRET, 0) != LUA_OK)
         {
             luaL_error(L, "Runtime error in running script %s:\t%s", path, lua_tostring(L, -1));
@@ -213,7 +210,7 @@ static int import(lua_State *L)
             // stack [retval1]
             reg_ref = luaL_ref(L, LUA_REGISTRYINDEX);
         }
-        shput(import_cache, path, reg_ref);
+        shput(import_cache, strdup(path), reg_ref);
     }
     else
     {
@@ -232,8 +229,8 @@ static struct
 {
     char *key;
     // This is meant to be a hashset not a hashmap
-    char value;
-} *library_set;
+    int value;
+} *library_set = nullptr;
 
 // A basic stack of lua files to be run after package resolution
 // this is all the _post files that libraries have
@@ -251,17 +248,16 @@ static char *get_post_path(lua_State *L, char *path)
 
 /* This is the common library load path*/
 static void load_library(lua_State *L, char *path)
-{
-    // Initialize the set
+{ 
     if (library_set == nullptr)
         sh_new_arena(library_set);
 
     // Check if this one has been loaded already
-    if (shgeti(library_set, path) == -1)
+    if (shgeti(library_set, path) != -1)
         return;
 
     // Make sure it can't be loaded again
-    shput(library_set, path, 0);
+    shput(library_set, strdup(path), 0);
 
     // Now we stat the prepath
     static char pathclone[PATH_MAX];
