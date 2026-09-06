@@ -10,6 +10,7 @@
 
 #include "calculus/luaenv.h"
 #include "calculus/paths.h"
+#include "calculus/gittools.h"
 #include "common/crypto.h"
 #include "common/command.h"
 #include "common/debug.h"
@@ -262,10 +263,9 @@ static void load_library(lua_State *L, char *path)
     // Make sure it can't be loaded again
     shput(library_set, path, 0);
 
-
     // Now we stat the prepath
     static char pathclone[PATH_MAX];
-                          /* DST! */
+    /* DST! */
     char *clone = strncpy(pathclone, path, PATH_MAX - 1);
     if (clone == nullptr)
     {
@@ -273,7 +273,6 @@ static void load_library(lua_State *L, char *path)
     }
 
     char *pre = get_pre_path(L, path);
-
 
     struct stat stat_buf;
     if (stat(pre, &stat_buf) == -1)
@@ -303,6 +302,24 @@ static void load_library(lua_State *L, char *path)
 static char *get_gitpath(lua_State *L, sha256_t *input_sha)
 {
     static char gitpath[PATH_MAX];
+
+    // Let's first stat the git cache directory
+    struct stat stat_buf;
+    if (stat(GIT_CACHE_DIRECTORY, &stat_buf) == -1)
+    {
+        if (errno == ENOENT)
+        {
+            // We might have to recursively do this at some point
+            mode_t old = umask(0);
+            int res = mkdir(GIT_CACHE_DIRECTORY, 0777);
+            umask(old);
+            if (res == -1)
+                LUA_PERROR("mkdir");
+        }
+        else
+            LUA_PERROR("stat");
+    }
+
     char *real = realpath(GIT_CACHE_DIRECTORY, gitpath);
     if (real == nullptr)
         LUA_PERROR("realpath");
@@ -358,7 +375,7 @@ static void rollback(const char *path)
 }
 
 // Returns false if the direcotory needs to be setup, and automatically runs the initial git commands
-static bool git_setup_directory(lua_State *L, const char *remote, const char *path)
+static bool git_setup_directory(lua_State *L, const char *path)
 {
     if (exists_dir(L, path))
         return true;
@@ -369,33 +386,7 @@ static bool git_setup_directory(lua_State *L, const char *remote, const char *pa
     if (status == -1)
         LUA_PERROR("mkdir");
 
-    const char *init_command[] = {"git", "-C", path, "init", nullptr};
-    if (command_run(init_command) != 0)
-    {
-        rollback(path);
-        luaL_error(L, "Failed to initialize git repository when importing library");
-    }
-    const char *remote_command[] = {"git", "-C", path, "remote", "add", "origin", remote, nullptr};
-    if (command_run(remote_command) != 0)
-    {
-        rollback(path);
-        luaL_error(L, "Failed to add git remote when importing library");
-    }
     return false;
-}
-
-static void git_finalize_directory(lua_State *L, const char *path)
-{
-
-    const char *checkout_command[] = {"git"
-                                      "-C",
-                                      path, "checkout", "FETCH_HEAD", nullptr};
-    if (command_run(checkout_command) != 0)
-    {
-        rollback(path);
-        luaL_error(L, "Failed to checkout fetch head when importing library");
-    }
-    // No submodules yet, nor LFS
 }
 
 /* Resolve a git directory, cloning and caching it*/
@@ -408,16 +399,14 @@ static char *git_commit(lua_State *L, const char *remote, const char *sha)
     sha256_appends(&ingest, ")");
     sha256_t cache_tag = sha256_finalize(&ingest);
     char *path = get_gitpath(L, &cache_tag);
-    if (git_setup_directory(L, remote, path))
+    if (git_setup_directory(L, path))
         return path;
 
-    const char *fetch_command[] = {"git", "-C", path, "fetch", "--depth", "1", "origin", sha, nullptr};
-    if (command_run(fetch_command) != 0)
+    if (fetch_sha(path, remote, sha))
     {
         rollback(path);
-        luaL_error(L, "Failed to fetch sha when importing library");
+        luaL_error(L, "failed to fetch git library: %s", stored_git_error);
     }
-    git_finalize_directory(L, path);
     return path;
 }
 
@@ -430,18 +419,14 @@ static char *git_tag(lua_State *L, const char *remote, const char *tag)
     sha256_appends(&ingest, ")");
     sha256_t cache_tag = sha256_finalize(&ingest);
     char *path = get_gitpath(L, &cache_tag);
-    if (git_setup_directory(L, remote, path))
+    if (git_setup_directory(L, path))
         return path;
-    char refspec[512];
-    snprintf(refspec, sizeof(refspec), "refs/tags/%s:refs/tags/%s", tag, tag);
 
-    const char *fetch_command[] = {"git", "-C", path, "fetch", "--depth", "1", "origin", refspec, nullptr};
-    if (command_run(fetch_command) != 0)
+    if (fetch_tag(path, remote, tag))
     {
         rollback(path);
-        luaL_error(L, "Failed to fetch tag when importing library");
+        luaL_error(L, "failed to fetch git library: %s", stored_git_error);
     }
-    git_finalize_directory(L, path);
     return path;
 }
 

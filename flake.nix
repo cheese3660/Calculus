@@ -20,11 +20,16 @@
                 cmake
                 pkg-config
                 libgit2
+                openssl
+                pcre2
+                libssh2
+                zlib
             ];
 
             packages = with pkgs; [
                 clang-tools
                 gdb
+                bashInteractive
             ];
         };
     };

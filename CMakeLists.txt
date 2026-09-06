@@ -8,8 +8,8 @@ set(CMAKE_C_STANDARD_REQUIRED ON)
 
 find_package(PkgConfig REQUIRED)
 
-# Statically link lua
-pkg_check_modules(LUA REQUIRED lua)
+pkg_check_modules(LUA REQUIRED IMPORTED_TARGET lua)
+pkg_check_modules(LIBGIT2 REQUIRED IMPORTED_TARGET libgit2)
 
 add_executable(calculus 
     src/calculus_main.c
@@ -19,6 +19,7 @@ add_executable(calculus
     src/common/command.c
 
     src/calculus/luaenv.c
+    src/calculus/gittools.c
     
     src/thirdparty/stb_ds.c
 )
@@ -33,5 +34,7 @@ target_include_directories(calculus PRIVATE include)
 target_include_directories(car PRIVATE include)
 
 # Different projects need different things, as we might have multiple executables
-target_include_directories(calculus PRIVATE ${LUA_INCLUDE_DIRS})
-target_link_libraries(calculus PRIVATE ${LUA_LIBRARIES})
+# target_include_directories(calculus PRIVATE ${LUA_INCLUDE_DIRS})
+# target_link_libraries(calculus PRIVATE ${LUA_LIBRARIES})
+
+target_link_libraries(calculus PRIVATE PkgConfig::LUA PkgConfig::LIBGIT2)

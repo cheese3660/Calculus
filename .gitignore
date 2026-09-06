@@ -84,3 +84,6 @@ build/
 
 ### Vscode
 .vscode/
+
+### Current sub repository that will likely be moved
+calculus_packages/
