@@ -210,7 +210,7 @@ static int import(lua_State *L)
             // stack [retval1]
             reg_ref = luaL_ref(L, LUA_REGISTRYINDEX);
         }
-        shput(import_cache, strdup(path), reg_ref);
+        shput(import_cache, path, reg_ref);
     }
     else
     {
@@ -257,7 +257,7 @@ static void load_library(lua_State *L, char *path)
         return;
 
     // Make sure it can't be loaded again
-    shput(library_set, strdup(path), 0);
+    shput(library_set, path, 0);
 
     // Now we stat the prepath
     static char pathclone[PATH_MAX];
