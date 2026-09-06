@@ -27,7 +27,6 @@ static uint32_t k[] = {
 
 sha256_t sha256_hash(const void *data, size_t len)
 {
-    debug("Hashing data of length %ld", len);
     sha256_ingest_t ingest = {};
     sha256_append(&ingest, data, len);
     return sha256_finalize(&ingest);
@@ -35,7 +34,6 @@ sha256_t sha256_hash(const void *data, size_t len)
 
 sha256_t sha256_hashf(FILE* file)
 {
-    debug("Hashing file");
     sha256_ingest_t ingest = {};
     sha256_appendf(&ingest, file);
     return sha256_finalize(&ingest);
@@ -136,8 +134,6 @@ static void consume_chunk(sha256_ingest_t *ingest)
 
 static void append_unsafe(sha256_ingest_t *ingest, const uint8_t *data, size_t len)
 {
-    debug("Appending data of length %ld", len);
-
     while (len != 0)
     {
         size_t can_consume = 64 - ingest->chunk_ptr;
@@ -205,9 +201,7 @@ sha256_t sha256_finalize(sha256_ingest_t *ingest)
         ingest->result = initial;
     }
 
-    debug("Finalizing ingest!");
     uint64_t length = (ingest->chunk_count * 64 + ingest->chunk_ptr) * 8;
-    debug("Length = %ld", length);
     size_t bytes_in_block = ingest->chunk_ptr;
     size_t remaining = (bytes_in_block < 56) ? (64 - bytes_in_block) : (128 - bytes_in_block);
     uint8_t *data = malloc(remaining);
