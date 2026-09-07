@@ -13,6 +13,7 @@
 #include <sys/types.h>
 #include "calculus/derivative.h"
 #include "calculus/build.h"
+#include <sys/stat.h>
 
 #define SHA256(X)                                            \
     do                                                       \
@@ -23,6 +24,8 @@
 
 int main(int argc, const char** argv)
 {
+    // Let's make sure we have no umask issues
+    umask(0);
     // printf("My euid is %d\n", geteuid());
     // uid_t euid = geteuid();
     // if (euid != 0) {
@@ -55,7 +58,8 @@ int main(int argc, const char** argv)
     for (derivative_header_t* deriv = buildstack_next(stack); deriv != nullptr; deriv = buildstack_next(stack)) 
     {
         printf("%ld - %s\n", i2++, get_derivative_store_path(deriv));
-        build_derivative(deriv);
+        if (build_derivative(deriv))
+            break;
     }
 
     buildstack_free(stack);

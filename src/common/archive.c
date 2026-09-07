@@ -466,8 +466,6 @@ static extract_result_t process_extract(const char *data, size_t n)
             if (n == 0)
                 return EXTRACT_CONTINUE;
             ent_attr = (uint8_t)*(data++);
-            // See this is where we have to be careful
-            mode_t old_mask = umask(0);
             // Splat out the permissions
             mode_t permissions = (ent_attr & 0b111);
             permissions |= (permissions << 3) | (permissions << 6);
@@ -476,7 +474,6 @@ static extract_result_t process_extract(const char *data, size_t n)
                 // Directory
                 debug("Creating directory '%s'", ent_path);
                 int status = mkdir(ent_path, permissions);
-                umask(old_mask);
                 if (status == -1)
                 {
                     perror("mkdir");
@@ -491,7 +488,6 @@ static extract_result_t process_extract(const char *data, size_t n)
             if ((ent_attr & ATTR_LINK) != 0)
             {
                 debug("Creating symlink '%s'", ent_path);
-                umask(old_mask);
                 extract_state = LINK_TARGET;
                 link_target_count = 0;
                 break;
@@ -499,7 +495,6 @@ static extract_result_t process_extract(const char *data, size_t n)
 
             if ((ent_attr & ATTR_FILE) == 0)
             {
-                umask(old_mask);
                 fprintf(stderr, "error: invalid attribute bit\n");
                 extract_state = STOPPED;
                 return EXTRACT_ERROR;
@@ -507,7 +502,6 @@ static extract_result_t process_extract(const char *data, size_t n)
 
             debug("Creating file '%s'", ent_path);
             extract_fd = open(ent_path, O_WRONLY | O_CREAT | O_EXCL, permissions);
-            umask(old_mask);
             if (extract_fd == -1)
             {
                 perror("open");

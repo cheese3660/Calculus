@@ -395,26 +395,7 @@ static bool exists_dir(lua_State *L, const char *directory)
     return true;
 }
 
-static int recursive_delete(const char *fpath, const struct stat *sb, int type_flag, struct FTW *ftwbuf)
-{
-    (void)sb;
-    (void)type_flag;
-    (void)ftwbuf;
-    int status = remove(fpath);
 
-    if (status == -1)
-        perror(fpath);
-
-    return status;
-}
-
-static void rollback(const char *path)
-{
-    if (nftw(path, recursive_delete, 64 /* open fds */, FTW_DEPTH | FTW_PHYS) != 0)
-    {
-        panic("Failed to rollback failed git directory, state may be incorrect!");
-    }
-}
 
 // Returns false if the direcotory needs to be setup, and automatically runs the initial git commands
 static bool git_setup_directory(lua_State *L, const char *path)
@@ -422,9 +403,7 @@ static bool git_setup_directory(lua_State *L, const char *path)
     if (exists_dir(L, path))
         return true;
 
-    mode_t old_umask = umask(0);
     int status = mkdir(path, 0777);
-    umask(old_umask);
     if (status == -1)
         LUA_PERROR("mkdir");
 
@@ -446,7 +425,7 @@ static char *git_commit(lua_State *L, const char *remote, const char *sha)
 
     if (fetch_sha(path, remote, sha))
     {
-        rollback(path);
+        fs_rmdir(path);
         luaL_error(L, "failed to fetch git library: %s", stored_git_error);
     }
     return path;
@@ -466,7 +445,7 @@ static char *git_tag(lua_State *L, const char *remote, const char *tag)
 
     if (fetch_tag(path, remote, tag))
     {
-        rollback(path);
+        fs_rmdir(path);
         luaL_error(L, "failed to fetch git library: %s", stored_git_error);
     }
     return path;

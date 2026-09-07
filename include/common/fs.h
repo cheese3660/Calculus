@@ -21,3 +21,9 @@ bool fs_isreg(const char* path);
 /// @param path The target path
 /// @return -1 on failure, 0 on success
 int fs_ensure_dir(const char* path);
+
+
+/// @brief DANGEROUS - completely delete a directory, basically rm -rf, make absolutely sure you are passing a proper path into this!!!
+/// @param path The path to delete
+/// @return -1 on failure, 0 on success
+int fs_rmdir(const char *path);

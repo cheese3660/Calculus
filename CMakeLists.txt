@@ -42,4 +42,4 @@ target_include_directories(car PRIVATE include)
 # target_include_directories(calculus PRIVATE ${LUA_INCLUDE_DIRS})
 # target_link_libraries(calculus PRIVATE ${LUA_LIBRARIES})
 
-target_link_libraries(calculus PRIVATE PkgConfig::LUA PkgConfig::LIBGIT2 PkgConfig::LIBARCHIVE)
+target_link_libraries(calculus PRIVATE PkgConfig::LUA PkgConfig::LIBGIT2 PkgConfig::LIBARCHIVE PkgConfig::LIBCURL)
