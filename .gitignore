@@ -86,4 +86,7 @@ build/
 .vscode/
 
 ### Current sub repository that will likely be moved
-calculus_packages/
+_utils/
+
+### Calculus relative path build directoy
+.rel/

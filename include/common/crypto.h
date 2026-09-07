@@ -28,10 +28,24 @@ sha256_t sha256_hashf(FILE* file);
 /// @return a 64 character long string of the sha256 digest in hexadecimal
 const char* sha256_to_hex(sha256_t* hash);
 
+/// @brief The reverse of sha256_to_hex
+/// @param hex The hex
+/// @return The sha256 that the hex value represents
+sha256_t hex_to_sha256(const char* hex);
+
 /// @brief Convert a hash to a base64 string, the returned data is in a preallocated buffer and will be overwritten on the next call (different than the hex buffer)
 /// @param hash the sha256 hash
 /// @return a 44 character long string of the sha256 digest in base64
 const char* sha256_to_b64(sha256_t* hash);
+
+/// @brief Compares 2 sha256 sums
+/// @param a The first sum
+/// @param b The second sum
+/// @return 0 if they are equal, the value returned from memcmp if not
+static inline int sha256_cmp(sha256_t* a, sha256_t* b)
+{
+    return memcmp(a, b, sizeof(sha256_t));
+}
 
 
 typedef struct {

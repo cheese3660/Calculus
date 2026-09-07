@@ -10,6 +10,8 @@ find_package(PkgConfig REQUIRED)
 
 pkg_check_modules(LUA REQUIRED IMPORTED_TARGET lua)
 pkg_check_modules(LIBGIT2 REQUIRED IMPORTED_TARGET libgit2)
+pkg_check_modules(LIBARCHIVE REQUIRED IMPORTED_TARGET libarchive)
+pkg_check_modules(LIBCURL REQUIRED IMPORTED_TARGET libcurl)
 
 add_executable(calculus 
     src/calculus_main.c
@@ -17,10 +19,13 @@ add_executable(calculus
     src/common/crypto.c
     src/common/archive.c # Used for moving stuff between stores/caches
     src/common/command.c
+    src/common/fs.c
 
     src/calculus/luaenv.c
     src/calculus/gittools.c
-    
+    src/calculus/derivative.c
+    src/calculus/build.c
+
     src/thirdparty/stb_ds.c
 )
 
@@ -37,4 +42,4 @@ target_include_directories(car PRIVATE include)
 # target_include_directories(calculus PRIVATE ${LUA_INCLUDE_DIRS})
 # target_link_libraries(calculus PRIVATE ${LUA_LIBRARIES})
 
-target_link_libraries(calculus PRIVATE PkgConfig::LUA PkgConfig::LIBGIT2)
+target_link_libraries(calculus PRIVATE PkgConfig::LUA PkgConfig::LIBGIT2 PkgConfig::LIBARCHIVE)

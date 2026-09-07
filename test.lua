@@ -1,8 +1,10 @@
 -- Call our test module
 use {
-    url = "https://github.com/cheese3660/CalculusPackages.git",
-    sha = "3994cd8eacfa0b065f8fad8a94496f2acc715661"
+    -- url = "https://github.com/cheese3660/CalculusPackages.git",
+    -- sha = "3994cd8eacfa0b065f8fad8a94496f2acc715661"
+    path = "./_utils/calculus_packages"
 }
 
-print(something)
-print(test)
+system_packages {
+    "linux_headers"
+}

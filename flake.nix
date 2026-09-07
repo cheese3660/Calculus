@@ -13,6 +13,7 @@
     {
         devShells.${system}.default = pkgs.mkShell {
             name = "calculus";
+
             buildInputs = with pkgs; [
                 git
                 gcc
@@ -24,8 +25,9 @@
                 pcre2
                 libssh2
                 zlib
+                libarchive
+                curl
             ];
-
             packages = with pkgs; [
                 clang-tools
                 gdb
