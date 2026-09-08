@@ -58,8 +58,8 @@ int main(int argc, const char** argv)
     for (derivative_header_t* deriv = buildstack_next(stack); deriv != nullptr; deriv = buildstack_next(stack)) 
     {
         printf("%ld - %s\n", i2++, get_derivative_store_path(deriv));
-        if (build_derivative(deriv))
-            break;
+        // if (build_derivative(deriv))
+        //     break;
     }
 
     buildstack_free(stack);

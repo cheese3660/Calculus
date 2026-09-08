@@ -61,11 +61,5 @@ static int recursive_delete(const char *fpath, const struct stat *sb, int type_f
 
 int fs_rmdir(const char *path)
 {
-    static char check[4096];
-    const char* real = realpath(path, check);
-    if (strcmp(real,"/") == 0)
-    {
-        panic("attempting to remove root!");
-    }
     return nftw(path, recursive_delete, 64, FTW_DEPTH | FTW_PHYS);
 }

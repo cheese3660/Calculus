@@ -23,6 +23,12 @@ int car_hash(const char* path, sha256_t *result);
 int car_archive(const char *path, FILE *target);
 
 
+/// @brief Write the calculus archive of a directory to a file, putting a umask on the permission bits to make it readonly
+/// @param path The directory to archive
+/// @param target The file to write the archive to
+/// @return 0 on success, -1 on failure with the errno number kept the same from the failure, and a warning printed to stderr using perror
+int car_archive_ro(const char *path, FILE *target);
+
 /// @brief Extract a calculus archive into a directory
 /// @param car_file The archive
 /// @param path The directory to write the files out to, must already exist

@@ -155,43 +155,111 @@ const char *get_derivative_store_path(derivative_header_t *derivative)
     return path_buf;
 }
 
-static derivative_header_t **push(derivative_header_t **stack, derivative_header_t *wanted)
-{
-    for (ssize_t i = 0; i < arrlen(stack); i++)
-    {
-        if (stack[i] == wanted)
-            return stack;
-    }
+// static derivative_header_t **push(derivative_header_t **stack, derivative_header_t *wanted)
+// {
+//     for (ssize_t i = 0; i < arrlen(stack); i++)
+//     {
+//         if (stack[i] == wanted)
+//             return stack;
+//     }
 
-    static char buffer[PATH_MAX];
-    snprintf(buffer, PATH_MAX, "%s/%s", CALCULUS_STORE_DIRECTORY, get_derivative_node_name(wanted));
-    if (fs_exists(buffer))
-        return stack;
+//     static char buffer[PATH_MAX];
 
-    arrpush(stack, wanted);
+//     debug("pushing - %s", get_derivative_node_name(wanted));
+//     arrpush(stack, wanted);
 
-    if (wanted->dtype == DT_STANDARD)
-    {
-        standard_derivative_t *actual = (standard_derivative_t *)wanted;
-        for (size_t i = 0; i < actual->num_dependencies; i++)
-        {
-            stack = push(stack, actual->dependencies[i]);
-        }
-    }
+//     if (wanted->dtype == DT_STANDARD)
+//     {
+//         standard_derivative_t *actual = (standard_derivative_t *)wanted;
+//         for (size_t i = 0; i < actual->num_dependencies; i++)
+//         {
+//             stack = push(stack, actual->dependencies[i]);
+//         }
+//     }
 
-    return stack;
-}
+//     return stack;
+// }
 
 // This one is going to be a bit complicated
 // We need to traverse each of the ones in wanted
 derivative_header_t **get_buildstack(derivative_header_t **wanted, size_t len)
 {
-    derivative_header_t **stack = {};
+    static char buffer[PATH_MAX];
+    derivative_header_t **stack = nullptr;
+
+    derivative_header_t **queue = nullptr;
+
+    // First we set up the queue
     for (size_t i = 0; i < len; i++)
     {
-        stack = push(stack, wanted[i]);
+        arrpush(queue, wanted[i]);
     }
-    return stack;
+
+    // Do a depth first search to get what we actually need
+    while (arrlen(queue) > 0)
+    {
+        derivative_header_t *current = queue[0];
+        arrdel(queue, 0);
+        bool skip = false;
+        for (ssize_t i = 0; i < arrlen(stack); i++)
+        {
+            if (stack[i] == current)
+                skip = true;
+        }
+
+        if (skip)
+            continue;
+
+        snprintf(buffer, PATH_MAX, "%s/%s", CALCULUS_STORE_DIRECTORY, get_derivative_node_name(current));
+
+        debug("checking - %s", buffer);
+        if (fs_exists(buffer))
+            continue;
+
+        debug("pushing - %s", get_derivative_node_name(current));
+        arrpush(stack, current);
+
+        if (current->dtype == DT_STANDARD)
+        {
+            standard_derivative_t *actual = (standard_derivative_t *)current;
+            for (size_t i = 0; i < actual->num_dependencies; i++)
+            {
+                arrpush(queue, actual->dependencies[i]);
+            }
+        }
+    }
+
+    /// HOLLLLY FUCK CAN THIS BE OPTIMIZED
+    while (arrlen(stack) > 0)
+    {
+        for (ssize_t i = arrlen(stack) - 1; i >= 0; i--)
+        {
+            derivative_header_t *current = stack[i];
+            if (current->dtype == DT_STANDARD)
+            {
+                standard_derivative_t *std = (standard_derivative_t *)current;
+                for (size_t dep = 0; dep < std->num_dependencies; dep++)
+                {
+                    for (ssize_t j = 0; j < arrlen(stack); j++)
+                    {
+                        if (j == i)
+                            continue;
+                        if (stack[j] == std->dependencies[dep])
+                            goto keep;
+                    }
+                }
+                arrpush(queue, current);
+            }
+            else
+            {
+                arrpush(queue, current);
+            }
+            arrdel(stack, i);
+        keep:;
+        }
+    }
+
+    return queue;
 }
 
 size_t buildstack_len(derivative_header_t **stack)
@@ -203,7 +271,10 @@ derivative_header_t *buildstack_next(derivative_header_t **stack)
 {
     if (arrlen(stack) > 0)
     {
-        return arrpop(stack);
+        // return arrpop(stack);
+        derivative_header_t *result = stack[0];
+        arrdel(stack, 0);
+        return result;
     }
     else
     {

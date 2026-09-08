@@ -315,6 +315,103 @@ static int archive_single(void *cookie, const char *rel_path, const char *root_p
     return 0;
 }
 
+static int archive_single_ro(void *cookie, const char *rel_path, const char *root_path, const char *full_path)
+{
+    // The cookie is the file we are writing into
+    FILE *file = cookie;
+
+    struct stat stat_result;
+
+    // Use lstat here because this could be a symlink
+    int s = lstat(full_path, &stat_result);
+    if (s != 0)
+    {
+        perror("lstat");
+        return s;
+    }
+
+    uint32_t mode = stat_result.st_mode;
+
+    uint8_t attr = get_attrs(mode);
+
+    if (attr == 0xff)
+        return 0;
+
+    // Disable the write bits
+    attr &= ~2;
+
+    // Okay now this is where we diverge - we start with the name here
+    fwrite(rel_path, 1, strlen(rel_path) + 1, file);
+    fwrite(&attr, 1, 1, file);
+
+    if (S_ISLNK(mode))
+    {
+        static char linkbuf[PATH_MAX];
+        ssize_t len = readlink(full_path, linkbuf, PATH_MAX);
+        if (len == -1)
+        {
+            // We have an invalid paramter here
+            perror("readlink");
+            return -1;
+        }
+        linkbuf[len] = 0;
+        size_t res = fwrite(linkbuf, 1, len + 1, file);
+        if (res != (size_t)len + 1)
+            perror("fwrite");
+        return res;
+    }
+
+    if (S_ISREG(mode))
+    {
+        uint64_t size = stat_result.st_size;
+        // res is the number of elements written
+        size_t res = fwrite(&size, sizeof(uint64_t), 1, file);
+        if (res != 1)
+        {
+            perror("fwrite");
+            return -1;
+        }
+
+        FILE *other = fopen(full_path, "r");
+        if (other == nullptr)
+        {
+            perror("fopen");
+            return -1;
+        }
+
+        static uint8_t buffer[4096]; // Use a 4 kilobyte r/w buffer
+
+        while (!feof(other))
+        {
+            size_t read = fread(buffer, 1, 4096, other);
+            if (read != 4096 && ferror(other))
+            {
+                perror("fread");
+                fclose(other);
+                return -1;
+            }
+            size_t written = fwrite(buffer, 1, read, file);
+            if (written != read)
+            {
+                perror("fwrite");
+                fclose(other);
+                return -1;
+            }
+        }
+
+        fclose(other);
+    }
+
+    if (S_ISDIR(mode))
+    {
+        // We recursively search here now
+        int res = iterate(rel_path, root_path, archive_single_ro, cookie);
+        return res;
+    }
+
+    return 0;
+}
+
 int car_archive(const char *path, FILE *target)
 {
     if (path == nullptr)
@@ -341,6 +438,47 @@ int car_archive(const char *path, FILE *target)
 
     // Now do the recursive writing
     int res = iterate(".", real_res, archive_single, target);
+    if (res != 0)
+    {
+        return res;
+    }
+
+    // And write the last null byte to signal the end of the archive
+    written = fwrite("", 1, 1, target);
+    if (written != 1)
+    {
+        perror("fwrite");
+        return -1;
+    }
+    return 0;
+}
+
+int car_archive_ro(const char *path, FILE *target)
+{
+    if (path == nullptr)
+        panic("path must not be null");
+    if (target == nullptr)
+        panic("target must not be null");
+
+    // Get the real path
+    static char real[PATH_MAX];
+    char *real_res = realpath(path, real);
+    if (real_res == nullptr)
+    {
+        perror("realpath");
+        return -1;
+    }
+
+    // Write the header
+    size_t written = fwrite("CAR", 1, 4, target);
+    if (written != 4)
+    {
+        perror("fwrite");
+        return -1;
+    }
+
+    // Now do the recursive writing
+    int res = iterate(".", real_res, archive_single_ro, target);
     if (res != 0)
     {
         return res;
