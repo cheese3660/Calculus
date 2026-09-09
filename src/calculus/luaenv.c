@@ -185,6 +185,7 @@ static struct
     int value;
 } *import_cache;
 
+
 static int import(lua_State *L)
 {
     int argc = lua_gettop(L);
@@ -193,20 +194,28 @@ static int import(lua_State *L)
     const char *relative = lua_tostring(L, 1);
     if (relative == nullptr)
         luaL_error(L, "import(path): path must be a string, got a %s", luaL_typename(L, 1));
-    char *path = caller_relative(L, relative);
+    char *r_path = caller_relative(L, relative);
+    char *path = malloc(PATH_MAX);
+    strcpy(path, r_path); // This is guarenteed to be PATH_MAX at most
 
     // Now we stat the path to decide what to do with it, as if its a directory we want to instead run `module.lua` inside the directory
     struct stat stat_buf;
     if (stat(path, &stat_buf) == -1)
+    {
+        free(path);
         LUA_PERROR("stat");
+    }
+
 
     mode_t mode = stat_buf.st_mode;
     if (S_ISDIR(mode))
     {
-        // Let us concatenate "/"
         path = get_module_path(L, path);
         if (stat(path, &stat_buf) == -1)
         {
+            // Free is guaranteed to reserve errno, see man 3 free:
+            // The free() function returns no value, and preserves errno.
+            free(path);
             if (errno == ENOENT)
             {
                 luaL_error(L, "import(path): path is directoy without module.lua file");
@@ -221,6 +230,7 @@ static int import(lua_State *L)
 
     if (!S_ISREG(mode))
     {
+        free(path);
         luaL_error(L, "import(path): path is not a regular file or directory with module.lua file");
     }
 
@@ -256,12 +266,15 @@ static int import(lua_State *L)
             // stack [retval1]
             reg_ref = luaL_ref(L, LUA_REGISTRYINDEX);
         }
+
         shput(import_cache, path, reg_ref);
+        free(path);
     }
     else
     {
         // Already cached
         reg_ref = import_cache[index].value;
+        free(path);
     }
     lua_rawgeti(L, LUA_REGISTRYINDEX, reg_ref);
     // stack [..., import]
@@ -903,7 +916,7 @@ void env_setup()
     }
     state = luaL_newstate();
     // Maybe think about extending the sandbox
-    luaL_openselectedlibs(state, LUA_GLIBK | LUA_STRLIBK | LUA_UTF8LIBK | LUA_MATHLIBK | LUA_TABLIBK, 0);
+    luaL_openselectedlibs(state, LUA_GLIBK | LUA_STRLIBK | LUA_UTF8LIBK | LUA_MATHLIBK | LUA_TABLIBK | LUA_DBLIBK, 0);
     const char *blacklist[] = {
         "load",
         "loadfile",

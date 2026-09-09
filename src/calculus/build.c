@@ -1,5 +1,8 @@
 // This is the main calculus build file
 
+// TODO: Convert this into it's own program - calculus-integrate
+// That when given a derivative recipe in string form, integrates all it's requirements
+
 #define _GNU_SOURCE
 
 #include "common/fs.h"
@@ -77,11 +80,11 @@ static int copy_archive(struct archive *from, struct archive *to)
     }
 }
 
+static char archive_fullpath[PATH_MAX * 2];
+static char archive_targetpath[PATH_MAX * 2];
 // Extract as readonly
 static int extract_archive(const char *file, const char *directory)
 {
-    static char fullpath[PATH_MAX];
-    static char targetpath[PATH_MAX];
     int result;
 
     struct archive *from = archive_read_new();
@@ -104,26 +107,106 @@ static int extract_archive(const char *file, const char *directory)
     {
         const char *current_path = archive_entry_pathname(entry);
         mode_t current_perms = archive_entry_perm(entry);
-        snprintf(fullpath, PATH_MAX, "%s/%s", directory, current_path);
-        archive_entry_set_pathname(entry, fullpath);
+        snprintf(archive_fullpath, sizeof(archive_fullpath), "%s/%s", directory, current_path);
+        archive_entry_set_pathname(entry, archive_fullpath);
 
         const char *hardlink_target = archive_entry_hardlink(entry);
         if (hardlink_target != nullptr)
         {
-            snprintf(targetpath, PATH_MAX, "%s/%s", directory, hardlink_target);
-            archive_entry_set_hardlink(entry, targetpath);
+            snprintf(archive_targetpath, sizeof(archive_targetpath), "%s/%s", directory, hardlink_target);
+            archive_entry_set_hardlink(entry, archive_targetpath);
         }
 
         // Make the permissions readonly while extracting
         archive_entry_set_perm(entry, current_perms & ~0222);
         if ((result = archive_write_header(to, entry)))
         {
-            fprintf(stderr, "Warning reading entry %s: %s\n", fullpath, archive_error_string(to));
+            fprintf(stderr, "Warning reading entry %s: %s\n", archive_fullpath, archive_error_string(to));
         }
         else if (archive_entry_size(entry) > 0 && (result = copy_archive(from, to)))
         {
-            fprintf(stderr, "Error writing entry %s\n", fullpath);
+            fprintf(stderr, "Error writing entry %s\n", archive_fullpath);
         }
+
+        archive_write_finish_entry(to);
+    }
+
+    archive_read_close(from);
+    archive_read_free(from);
+    archive_write_close(to);
+    archive_write_free(to);
+
+    return result;
+}
+
+static int copy_directory_readonly(const char *from_directory, const char *directory)
+{
+    int result;
+
+    size_t from_len = strlen(from_directory);
+
+    struct archive *from = archive_read_disk_new();
+
+    struct archive *to = archive_write_disk_new();
+    archive_write_disk_set_options(to, ARCHIVE_EXTRACT_PERM | ARCHIVE_EXTRACT_SECURE_NODOTDOT);
+    archive_write_disk_set_standard_lookup(to);
+
+    if ((result = archive_read_disk_open(from, from_directory)) != ARCHIVE_OK)
+    {
+        fprintf(stderr, "Could not open source archive: %s\n", archive_error_string(from));
+        return result;
+    }
+
+    struct archive_entry *entry;
+
+    while (archive_read_next_header(from, &entry) == ARCHIVE_OK)
+    {
+        archive_read_disk_descend(from);
+
+        const char *current_path = archive_entry_pathname(entry);
+
+        if (strncmp(current_path, from_directory, from_len) == 0)
+        {
+            current_path += from_len;
+            while (*current_path == '/')
+            {
+                current_path++;
+            }
+        }
+
+        mode_t current_perms = archive_entry_perm(entry);
+        snprintf(archive_fullpath, sizeof(archive_fullpath), "%s/%s", directory, current_path);
+        archive_entry_set_pathname(entry, archive_fullpath);
+
+        const char *hardlink_target = archive_entry_hardlink(entry);
+        if (hardlink_target != nullptr)
+        {
+            // Fix extraction code
+            if (strncmp(hardlink_target, from_directory, from_len) == 0)
+            {
+                hardlink_target += from_len;
+                while (*hardlink_target == '/')
+                {
+                    hardlink_target++;
+                }
+            }
+
+            snprintf(archive_targetpath, sizeof(archive_targetpath), "%s/%s", directory, hardlink_target);
+            archive_entry_set_hardlink(entry, archive_targetpath);
+        }
+
+        // Make the permissions readonly while extracting
+        archive_entry_set_perm(entry, current_perms & ~0222);
+        if ((result = archive_write_header(to, entry)))
+        {
+            fprintf(stderr, "Warning reading entry %s: %s\n", archive_fullpath, archive_error_string(to));
+        }
+        else if (archive_entry_size(entry) > 0 && (result = copy_archive(from, to)))
+        {
+            fprintf(stderr, "Error writing entry %s\n", archive_fullpath);
+        }
+
+        archive_write_finish_entry(to);
     }
 
     archive_read_close(from);
@@ -165,7 +248,7 @@ static int build_tarball(fetch_tarball_derivative_t *tarball)
 
     if (!fp)
     {
-        fprintf(stderr, "error opening file to download tarball to: %s\n", strerror(errno));
+        fprintf(stderr, "error opening file to download tarball %s to: %s\n", tarball->url, strerror(errno));
         goto done;
     }
 
@@ -176,7 +259,7 @@ static int build_tarball(fetch_tarball_derivative_t *tarball)
     CURLcode error = curl_easy_perform(curl);
     if (error != CURLE_OK)
     {
-        fprintf(stderr, "error downloading tarball via curl: %s\n", curl_easy_strerror(error));
+        fprintf(stderr, "error downloading tarball %s via curl: %s\n", tarball->url, curl_easy_strerror(error));
         goto done;
     }
 
@@ -184,7 +267,8 @@ static int build_tarball(fetch_tarball_derivative_t *tarball)
     curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &http_code);
     if (http_code >= 400)
     {
-        fprintf(stderr, "downloading tarball failed with code %ld\n", http_code);
+        fprintf(stderr, "downloading tarball %s failed with code %ld\n", tarball->url, http_code);
+        remove(outfile_name);
         goto done;
     }
 
@@ -192,7 +276,7 @@ static int build_tarball(fetch_tarball_derivative_t *tarball)
     fp = fopen(outfile_name, "r");
     if (!fp)
     {
-        fprintf(stderr, "error opening tarball after downloading: %s\n", strerror(errno));
+        fprintf(stderr, "error opening tarball %s after downloading: %s\n", tarball->url, strerror(errno));
         goto done;
     }
     sha256_t file_hash = sha256_hashf(fp);
@@ -200,7 +284,7 @@ static int build_tarball(fetch_tarball_derivative_t *tarball)
     fp = nullptr;
     if (sha256_cmp(&file_hash, &tarball->dheader.dhash) != 0)
     {
-        fprintf(stderr, "tarball hash is not what was expected!\n");
+        fprintf(stderr, "tarball %s hash is not what was expected!\n", tarball->url);
         fprintf(stderr, "expected: %s\n", sha256_to_hex(&tarball->dheader.dhash));
         fprintf(stderr, "got: %s\n", sha256_to_hex(&file_hash));
         remove(outfile_name);
@@ -214,7 +298,7 @@ static int build_tarball(fetch_tarball_derivative_t *tarball)
         // And owned by root
         if (chown(outfile_name, 0, 0) == -1)
         {
-            fprintf(stderr, "error changing owner of tarball file: %s\n", strerror(errno));
+            fprintf(stderr, "error changing owner of tarball %s file: %s\n", tarball->url, strerror(errno));
             remove(outfile_name);
             goto done;
         }
@@ -225,13 +309,14 @@ static int build_tarball(fetch_tarball_derivative_t *tarball)
     // Now let's make our directory
     if (mkdir(fp_buffer, 0777) == -1)
     {
-        fprintf(stderr, "error creating output directory for built tarball: %s\n", strerror(errno));
+        fprintf(stderr, "error creating output directory for built tarball %s: %s\n", tarball->url, strerror(errno));
         remove(outfile_name);
         goto done;
     }
 
     if (extract_archive(outfile_name, fp_buffer) != ARCHIVE_OK)
     {
+        fprintf(stderr, "error extracting tarball %s\n",tarball->url);
         remove(outfile_name);
         goto done;
     }
@@ -269,14 +354,15 @@ static int build_standard(standard_derivative_t *standard)
 
     char *out_path = nullptr;
 
+    // We first create the build directory that will be our chroot
+    snprintf(fp_buffer, 512, "%s/%s", CALCULUS_BUILD_DIRECTORY, get_derivative_node_name(&standard->dheader));
+
     if (asprintf(&out_path, "%s%s", fp_buffer, get_derivative_store_path(&standard->dheader)) == -1)
     {
         perror("asprintf");
         return -1;
     }
 
-    // We first create the build directory that will be our chroot
-    snprintf(fp_buffer, 512, "%s/%s", CALCULUS_BUILD_DIRECTORY, get_derivative_node_name(&standard->dheader));
     // We then make sure no build directory currently exists
     fs_rmdir(fp_buffer);
     if (fs_ensure_dir(fp_buffer) == -1)
@@ -298,19 +384,31 @@ static int build_standard(standard_derivative_t *standard)
     if (child < 0)
     {
         fprintf(stderr, "Fork failed when building directory for %s: %s\n", standard->name, strerror(errno));
-        goto fail;
+        fs_rmdir(fp_buffer);
+        return -1;
     }
     else if (child == 0)
     {
-        
-        // set up UID maps or else we can't create a tmpfs
-        uid_t uid = getuid();
-        gid_t gid = getgid();
-        // We are the child here
+
         close(pipefd[0]);
         dup2(pipefd[1], STDOUT_FILENO);
         dup2(pipefd[1], STDERR_FILENO);
         close(pipefd[1]);
+
+        int devnull = open("/dev/null", O_RDONLY);
+        if (devnull < 0)
+        {
+            fprintf(stderr, "Error setting up /dev/null stdin for %s: %s\n", standard->name, strerror(errno));
+            exit(EXIT_FAILURE);
+        }
+        dup2(devnull, STDIN_FILENO);
+        close(devnull);
+
+        // set up UID maps or else we can't create a tmpfs
+        uid_t uid = getuid();
+        gid_t gid = getgid();
+        // We are the child here
+
         if (unshare(
                 // Let us
                 CLONE_NEWCGROUP |
@@ -334,7 +432,7 @@ static int build_standard(standard_derivative_t *standard)
         }
         if (write(fd, "deny", 4) == -1)
         {
-            fprintf(stderr, "Error writing to uid map (setgroups) for %s: %s", standard->name,strerror(errno));
+            fprintf(stderr, "Error writing to uid map (setgroups) for %s: %s", standard->name, strerror(errno));
             exit(EXIT_FAILURE);
         }
         close(fd);
@@ -342,13 +440,13 @@ static int build_standard(standard_derivative_t *standard)
         fd = open("/proc/self/uid_map", O_WRONLY);
         if (fd == -1)
         {
-            fprintf(stderr, "Error setting up uid map (uid_map) for %s: %s", standard->name,strerror(errno));
+            fprintf(stderr, "Error setting up uid map (uid_map) for %s: %s", standard->name, strerror(errno));
             exit(EXIT_FAILURE);
         }
         snprintf(map_buf, sizeof(map_buf), "0 %d 1\n", uid);
         if (write(fd, map_buf, strlen(map_buf)) == -1)
         {
-            fprintf(stderr, "Error writing to uid map (uid_map) for %s: %s", standard->name,strerror(errno));
+            fprintf(stderr, "Error writing to uid map (uid_map) for %s: %s", standard->name, strerror(errno));
             exit(EXIT_FAILURE);
         }
         close(fd);
@@ -356,13 +454,13 @@ static int build_standard(standard_derivative_t *standard)
         fd = open("/proc/self/gid_map", O_WRONLY);
         if (fd == -1)
         {
-            fprintf(stderr, "Error setting up uid map (gid_map) for %s: %s", standard->name,strerror(errno));
+            fprintf(stderr, "Error setting up uid map (gid_map) for %s: %s", standard->name, strerror(errno));
             exit(EXIT_FAILURE);
         }
         snprintf(map_buf, sizeof(map_buf), "0 %d 1\n", gid);
         if (write(fd, map_buf, strlen(map_buf)) == -1)
         {
-            fprintf(stderr, "Error writing to uid map (gid_map) for %s: %s", standard->name,strerror(errno));
+            fprintf(stderr, "Error writing to uid map (gid_map) for %s: %s", standard->name, strerror(errno));
             exit(EXIT_FAILURE);
         }
         close(fd);
@@ -460,7 +558,7 @@ static int build_standard(standard_derivative_t *standard)
             }
 
             snprintf(chroot_path_buffer, PATH_MAX, "%s/dev/zero", fp_buffer);
-            
+
             int zer_fd = open(chroot_path_buffer, O_WRONLY | O_CREAT | O_CLOEXEC, 0666);
             if (zer_fd == -1)
             {
@@ -476,7 +574,7 @@ static int build_standard(standard_derivative_t *standard)
             }
 
             snprintf(chroot_path_buffer, PATH_MAX, "%s/dev/random", fp_buffer);
-            
+
             int rnd_fd = open(chroot_path_buffer, O_WRONLY | O_CREAT | O_CLOEXEC, 0666);
             if (rnd_fd == -1)
             {
@@ -492,7 +590,7 @@ static int build_standard(standard_derivative_t *standard)
             }
 
             snprintf(chroot_path_buffer, PATH_MAX, "%s/dev/urandom", fp_buffer);
-            
+
             int urnd_fd = open(chroot_path_buffer, O_WRONLY | O_CREAT | O_CLOEXEC, 0666);
             if (urnd_fd == -1)
             {
@@ -712,7 +810,7 @@ static int build_standard(standard_derivative_t *standard)
 
             // TODO: Make this more efficient
             char *packages_var = malloc(strlen("packages=") + combined_count + 1);
-            strcpy(packages_var, "pacakges=");
+            strcpy(packages_var, "packages=");
             for (size_t i = 0; i < (size_t)arrlen(packages); i++)
             {
                 if (i > 0)
@@ -755,39 +853,25 @@ static int build_standard(standard_derivative_t *standard)
             {
                 fprintf(stderr, "Error waiting for builder to finish for %s: %s\n", standard->name, strerror(errno));
             }
+
             exit(code);
         }
     }
     else
     {
         close(pipefd[1]);
+
+        // Let's save the log here
         int status, code = EXIT_FAILURE;
-        if (waitpid(child, &status, 0) != -1)
-        {
-            if (WIFEXITED(status))
-            {
-                code = WEXITSTATUS(status);
-                if (code != EXIT_SUCCESS)
-                {
-                    fprintf(stderr, "Builder process returned %d\n", code);
-                }
-            }
-        }
-        else
-        {
-            fprintf(stderr, "Error waiting for builder to finish for %s: %s\n", standard->name, strerror(errno));
-            goto fail;
-        }
-        // Let's save the log either way
-        
         snprintf(log_buffer, 512, "%s/%s.log", CALCULUS_LOGS_DIRECTORY, get_derivative_node_name(&standard->dheader));
         int file_fd = open(log_buffer, O_WRONLY | O_CREAT | O_TRUNC, 0666);
         ssize_t n;
         if (file_fd == -1)
         {
             fprintf(stderr, "Warning, unable to create logs for %s: %s\n", standard->name, strerror(errno));
-            goto finalize;
+            goto skip_logs;
         }
+
         // Let's just reuse the store path buffer
         while ((n = read(pipefd[0], store_path_buffer, PATH_MAX)) > 0)
         {
@@ -811,39 +895,63 @@ static int build_standard(standard_derivative_t *standard)
             fprintf(stderr, "Warning, logs possibly truncated for %s: %s\n", standard->name, strerror(errno));
         }
         close(file_fd);
+    skip_logs:
+
+        if (waitpid(child, &status, 0) != -1)
+        {
+            if (WIFEXITED(status))
+            {
+                code = WEXITSTATUS(status);
+                if (code != EXIT_SUCCESS)
+                {
+                    fprintf(stderr, "Builder process returned %d\n", code);
+                }
+            }
+        }
+        else
+        {
+            fprintf(stderr, "Error waiting for builder to finish for %s: %s\n", standard->name, strerror(errno));
+
+            // Remove the build folder as soon as we can
+            fs_rmdir(fp_buffer);
+            return -1;
+        }
+        // Let's save the log either way
+
 
     finalize:
         if (code == EXIT_SUCCESS)
         {
-            // let us copy the file into our store and recursively make it readonly using car
+            // let us copy the file into our store and recursively make it readonly using libarchive
             snprintf(store_path_buffer, PATH_MAX, CALCULUS_STORE_DIRECTORY "/%s", get_derivative_node_name(&standard->dheader));
             if (fs_isdir(out_path))
             {
-                FILE *carball = fopen("/tmp/out_carball", "w+");
-                if (car_archive_ro(out_path, carball) == -1)
+                if (mkdir(store_path_buffer, 0777) == -1)
+                {
+                    fprintf(stderr, "error creating directory in store: %s\n", strerror(errno));
+                    code = EXIT_FAILURE;
+                    goto true_finalize;
+                }
+
+                if (copy_directory_readonly(out_path, store_path_buffer) != ARCHIVE_OK)
                 {
                     code = EXIT_FAILURE;
                     goto true_finalize;
                 }
-                fclose(carball);
-                carball = fopen("/tmp/out_carball", "r+");
-                mkdir(store_path_buffer, 0777);
-                if (car_extract(carball, store_path_buffer) == -1)
+
+                if (chmod(store_path_buffer, 0555) == -1)
                 {
+                    fprintf(stderr, "error chmod'ing the directory in store: %s\n", strerror(errno));
                     code = EXIT_FAILURE;
-                    fs_rmdir(store_path_buffer);
                     goto true_finalize;
                 }
-                fclose(carball);
-                remove("/tmp/out_carball");
-                chmod(store_path_buffer, 0555);
             }
             else if (fs_isreg(out_path))
             {
                 struct stat stat_buf;
                 if (stat(out_path, &stat_buf) == -1)
                 {
-                    fprintf(stderr, "Error astating output file: %s\n", strerror(errno));
+                    fprintf(stderr, "Error stat()ing output file: %s\n", strerror(errno));
                     code = EXIT_FAILURE;
                     goto true_finalize;
                 }
@@ -887,8 +995,8 @@ static int build_standard(standard_derivative_t *standard)
                 fclose(from_file);
                 fclose(store_file);
 
-                goto true_finalize;
                 chmod(store_path_buffer, ((S_IXUSR & stat_buf.st_mode) > 0) ? 0555 : 0444);
+                goto true_finalize;
             }
             else
             {
@@ -898,19 +1006,15 @@ static int build_standard(standard_derivative_t *standard)
             }
         }
     true_finalize:
+        fs_rmdir(fp_buffer);
         if (code != EXIT_SUCCESS)
         {
             fprintf(stderr, "Build failed - logs are at %s\n", log_buffer);
-            goto fail;
+            return -1;
         }
     }
-
-    fs_rmdir(fp_buffer);
+    
     return 0;
-
-fail:
-    fs_rmdir(fp_buffer);
-    return -1;
 }
 
 int build_derivative(derivative_header_t *to_build)

@@ -6,5 +6,5 @@ use {
 }
 
 system_packages {
-    "linux_headers"
+    "glibc1"
 }

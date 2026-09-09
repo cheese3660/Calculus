@@ -80,6 +80,7 @@ fetch_tarball_derivative_t *create_fetch_tarball_derivative(
         if (((fetch_tarball_derivative_t *)preexisting)->extract != extract)
             return nullptr; // TODO: add error message here
 
+        
         return (fetch_tarball_derivative_t *)preexisting;
     }
 

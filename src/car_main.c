@@ -14,6 +14,7 @@ void usage(void)
     fprintf(stderr, "    path        the file/directory being processed\n");
     fprintf(stderr, "\n");
     fprintf(stderr, "    OPTIONS\n");
+    fprintf(stderr, "    -r          Archive read-only (clears write bits, for car_archive_ro)\n");
     fprintf(stderr, "    -a          Archive <path> to out.car\n");
     fprintf(stderr, "    -A <out>    Archive <path> to <out>\n");
     fprintf(stderr, "    -x          Extract <path> to the cwd\n");
@@ -80,13 +81,13 @@ static void hash(const char *path)
     }
 }
 
-static void archive(const char *path, const char *outpath)
+static void archive(const char *path, const char *outpath, int ro)
 {
     FILE *out = fopen(outpath, "w");
     if (out == nullptr)
         PERROR("fopen");
     
-    int res = car_archive(path, out);
+    int res = ro ? car_archive_ro(path, out) : car_archive(path, out);
     
     if (res != 0)
         exit(EXIT_FAILURE);
@@ -114,14 +115,18 @@ static void extract(const char* car_path, const char* outdir)
 int main(int argc, char **argv)
 {
     car_mode_t mode = MODE_UNKNOWN;
+    int ro = 0;
     const char *out_file = "out.car";
     const char *out_dir = ".";
     const char *path;
-    const char *opts = "aA:xX:Hh";
+    const char *opts = "aA:xX:Hhr";
     for (int opt = getopt(argc, argv, opts); opt != -1; opt = getopt(argc, argv, opts))
     {
         switch (opt)
         {
+        case 'r':
+            ro = 1;
+            break;
         case 'A':
             if (optarg == nullptr)
             {
@@ -165,7 +170,7 @@ int main(int argc, char **argv)
     switch (mode)
     {
     case MODE_ARCHIVE:
-        archive(path, out_file);
+        archive(path, out_file, ro);
         break;
     case MODE_EXTRACT:
         extract(path, out_dir);
