@@ -14,6 +14,8 @@
 #include "calculus/derivative.h"
 #include "calculus/build.h"
 #include <sys/stat.h>
+#include "thirdparty/stb_ds.h"
+#include "common/debug.h"
 
 #define SHA256(X)                                            \
     do                                                       \
@@ -21,6 +23,8 @@
         sha256_t x = sha256_string(X);                       \
         printf("SHA256('" X "') = %s\n", sha256_to_hex(&x)); \
     } while (0)
+
+void mermaid(FILE* output, derivative_header_t** wanted, size_t len);
 
 int main(int argc, const char** argv)
 {
@@ -52,6 +56,11 @@ int main(int argc, const char** argv)
         printf("- %s\n", get_derivative_store_path(derivs[i]));
     }
 
+    FILE* merm = fopen("mermaid.txt", "w+");
+    mermaid(merm, derivs, len);
+    fclose(merm);
+    printf("Mermaid diagram of build graph is at mermaid.txt\n");
+
     derivative_header_t** stack = get_buildstack(derivs, len);
     printf("Integrating %ld derivatives to achieve goal\n", buildstack_len(stack));
     size_t i2 = 0;
@@ -63,4 +72,83 @@ int main(int argc, const char** argv)
     }
 
     buildstack_free(stack);
+}
+
+
+derivative_header_t** mermaid_visited;
+
+void mermaid_step1(FILE* output, derivative_header_t* node)
+{
+    for (ssize_t i = 0; i < arrlen(mermaid_visited); i++)
+    {
+        if (mermaid_visited[i] == node)
+            return;
+    }
+    arrpush(mermaid_visited, node);
+
+    if (node->dtype == DT_STANDARD)
+    {
+        standard_derivative_t* n = (standard_derivative_t*)node;
+        fprintf(output, "    node_%s[\"%s\"]\n", sha256_to_hex(&node->dhash), n->name);
+        for (size_t i = 0; i < n->num_dependencies; i++)
+        {
+            mermaid_step1(output, n->dependencies[i]);
+        }
+    }
+    else if (node->dtype == DT_FETCH_TARBALL)
+    {
+        fetch_tarball_derivative_t* n = (fetch_tarball_derivative_t*)node;
+        fprintf(output, "    node_%s[\"%s\"]\n", sha256_to_hex(&node->dhash), n->url);
+    }
+    else
+    {
+        panic("Unknown node type");
+    }
+}
+
+void mermaid_step2(FILE* output, derivative_header_t* node)
+{
+    for (ssize_t i = 0; i < arrlen(mermaid_visited); i++)
+    {
+        if (mermaid_visited[i] == node)
+            return;
+    }
+    arrpush(mermaid_visited, node);
+
+    if (node->dtype == DT_STANDARD)
+    {
+        standard_derivative_t* n = (standard_derivative_t*)node;
+        char* hash = strdup(sha256_to_hex(&node->dhash));
+        for (size_t i = 0; i < n->num_dependencies; i++)
+        {
+            fprintf(output, "    node_%s --> node_%s\n", sha256_to_hex(&n->dependencies[i]->dhash),hash);
+            mermaid_step2(output, n->dependencies[i]);
+        }
+        free(hash);
+    }
+    else if (node->dtype == DT_FETCH_TARBALL)
+    {
+        // Nothing to do here
+    }
+    else
+    {
+        panic("Unknown node type");
+    }
+}
+
+// Let's create a mermaid diagram of the build graph
+void mermaid(FILE* output, derivative_header_t** wanted, size_t len)
+{
+    // We write the header out
+    fprintf(output, "flowchart TB\n");
+    for (size_t i = 0; i < len; i++)
+    {
+        mermaid_step1(output, wanted[i]);
+    }
+    arrfree(mermaid_visited);
+    mermaid_visited = nullptr;
+    for (size_t i = 0; i < len; i++)
+    {
+        mermaid_step2(output, wanted[i]);
+    }
 }

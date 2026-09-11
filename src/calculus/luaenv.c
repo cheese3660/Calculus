@@ -795,22 +795,22 @@ static void setup_derivative_mt(lua_State *L)
     lua_pop(L, 1);
 }
 
-static int fetch_tarball(lua_State *L)
+static int fetch(lua_State *L)
 {
     int argc = lua_gettop(L);
     if (argc != 1)
-        return luaL_error(L, "fetch_tarball(spec): expected 1 argument, got %d", argc);
+        return luaL_error(L, "fetch(spec): expected 1 argument, got %d", argc);
 
     if (!lua_istable(L, 1))
-        return luaL_error(L, "fetch_tarball(spec): spec must be a table, got a %s", luaL_typename(L, 1));
+        return luaL_error(L, "fetch(spec): spec must be a table, got a %s", luaL_typename(L, 1));
 
     if (lua_getfield(L, 1, "url") != LUA_TSTRING)
-        return luaL_error(L, "fetch_tarball(spec): spec must have a string field named url that determines which tarball to download");
+        return luaL_error(L, "fetch(spec): spec must have a string field named url that determines which file to download");
     
     const char* url = lua_tostring(L, -1);
 
     if (lua_getfield(L, 1, "hash") != LUA_TSTRING)
-        return luaL_error(L, "fetch_tarball(spec): spec must have a string field named hash to verify the tarballs hash");
+        return luaL_error(L, "fetch(spec): spec must have a string field named hash to verify the files hash");
     
     const char* hash = lua_tostring(L, -1);
 
@@ -823,7 +823,7 @@ static int fetch_tarball(lua_State *L)
     fetch_tarball_derivative_t* drv = create_fetch_tarball_derivative(url, hash, extract);
     
     if (drv == nullptr)
-        luaL_error(L, "fetch_tarball failed to create derivative (likely due to the same tarball being told extract and not)");
+        luaL_error(L, "fetch failed to create derivative (likely due to the same file being told extract and not)");
 
     push_derivative_userdata(L, (derivative_header_t*)drv);
 
@@ -856,7 +856,7 @@ static int derivative(lua_State *L)
     int len = lua_rawlen(L, -1);
 
     if (len == 0)
-        return luaL_error(L, "derivative(spec): a non-fixed derivative must have at least one dependency or it's build script won't be able to run!");
+        return luaL_error(L, "derivative(spec): a non-fixed derivative must have at least one dependency or it's build script won't be able to run! (%s)", name);
 
     derivative_header_t** deps = malloc(sizeof(derivative_header_t*) * len);
     
@@ -905,7 +905,7 @@ static struct
     {"isdir", isdir},
     {"isfile", isfile},
     {"listdir", listdir},
-    {"fetch_tarball", fetch_tarball},
+    {"fetch", fetch},
     {"derivative", derivative}};
 
 void env_setup()

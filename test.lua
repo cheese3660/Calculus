@@ -6,5 +6,5 @@ use {
 }
 
 system_packages {
-    "glibc1"
+    "naked_gcc"
 }
