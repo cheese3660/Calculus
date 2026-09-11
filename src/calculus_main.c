@@ -1,3 +1,12 @@
+/******************************************************************************
+ *
+ *  calculus_main.c
+ *  author: Lexi Allen
+ *  license: MIT
+ *  last updated: 9/11/2026
+ *
+ *****************************************************************************/
+
 /*
     Entry point for `calculus` the main part of the package manager
 

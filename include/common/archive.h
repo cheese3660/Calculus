@@ -1,3 +1,12 @@
+/******************************************************************************
+ *
+ *  archive.h
+ *  author: Lexi Allen
+ *  license: MIT
+ *  last updated: 9/11/2026
+ *
+ *****************************************************************************/
+
 /*
  * Used for content addressing when needed, and for otherwise moving folders around deterministically
  */

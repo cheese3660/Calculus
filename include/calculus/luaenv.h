@@ -1,3 +1,12 @@
+/******************************************************************************
+ *
+ *  luaenv.h
+ *  author: Lexi Allen
+ *  license: MIT
+ *  last updated: 9/11/2026
+ *
+ *****************************************************************************/
+
 #pragma once
 /*
  *  Structures and functions for the Calculus Lua environment

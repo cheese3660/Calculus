@@ -27,16 +27,12 @@ add_executable(calculus
     src/calculus/build.c
 
     src/thirdparty/stb_ds.c
-)
 
-add_executable(car
-    src/car_main.c
-    src/common/crypto.c # Used still for the hashing
-    src/common/archive.c # The main archival/dearchival entrypoint
+    # These are all the command verbs
+    src/verbs/build_verb.c # This is what builds
 )
 
 target_include_directories(calculus PRIVATE include)
-target_include_directories(car PRIVATE include)
 
 # Different projects need different things, as we might have multiple executables
 # target_include_directories(calculus PRIVATE ${LUA_INCLUDE_DIRS})

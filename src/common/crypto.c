@@ -1,3 +1,12 @@
+/******************************************************************************
+ *
+ *  crypto.c
+ *  author: Lexi Allen
+ *  license: MIT
+ *  last updated: 9/11/2026
+ *
+ *****************************************************************************/
+
 #include "common/crypto.h"
 #include "common/debug.h"
 #include <string.h>

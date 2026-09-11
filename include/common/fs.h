@@ -1,3 +1,12 @@
+/******************************************************************************
+ *
+ *  fs.h
+ *  author: Lexi Allen
+ *  license: MIT
+ *  last updated: 9/11/2026
+ *
+ *****************************************************************************/
+
 #pragma once
 
 // Filesystem tools that make checking for very basic things a lot simpler

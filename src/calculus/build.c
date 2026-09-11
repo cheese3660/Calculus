@@ -1,3 +1,12 @@
+/******************************************************************************
+ *
+ *  build.c
+ *  author: Lexi Allen
+ *  license: MIT
+ *  last updated: 9/11/2026
+ *
+ *****************************************************************************/
+
 // This is the main calculus build file
 
 // TODO: Convert this into it's own program - calculus-integrate

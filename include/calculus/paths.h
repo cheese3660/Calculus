@@ -1,3 +1,12 @@
+/******************************************************************************
+ *
+ *  paths.h
+ *  author: Lexi Allen
+ *  license: MIT
+ *  last updated: 9/11/2026
+ *
+ *****************************************************************************/
+
 #pragma once
 
 // This definition here is such that when we eventually want to build stuff on the actual root of the system
