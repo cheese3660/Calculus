@@ -93,14 +93,14 @@ string_t *s_ownl_p(const char *original, uint32_t len);
 /// @param format The format string
 /// @param ... The format parameters
 /// @return A new string allocated with the given format characters
-string_t s_fmt_a(const char *format, ...) __attribute__((format(printf,1,2)));
+string_t s_fmt_a(const char *format, ...) __attribute__((format(printf, 1, 2)));
 
 /// @brief Create a new string via a format string
 /// @param max_len The maximum length of the string from the string pool
 /// @param format The format string
 /// @param ... The format parameters
 /// @return A new string from the string pool with the given format characters
-string_t *s_fmt_p(uint32_t max_len, const char *format, ...) __attribute__((format(printf,2,3)));
+string_t *s_fmt_p(uint32_t max_len, const char *format, ...) __attribute__((format(printf, 2, 3)));
 
 /// @brief Create a view over a string, allowing modification but no reallocating
 /// @param original The string being viewed
@@ -122,18 +122,31 @@ string_t s_wrap(char *buffer, uint32_t buffer_capacity);
 /// @brief Sets the value of a string to the given string
 /// @param s The string
 /// @param value The given string
-void s_set(string_t *s, const char* value);
+void s_set(string_t *s, const char *value);
 
 /// @brief Sets the value of a string to the given string (with a known length)
 /// @param s The string
 /// @param value The given string
 /// @param len The known length
-void s_setl(string_t *s, const char* value, uint32_t len);
+void s_setl(string_t *s, const char *value, uint32_t len);
 
 /// @brief Sets the value of a string to the given string
 /// @param s The string
 /// @param value The given string
-void s_sets(string_t *s, string_t* value);
+void s_sets(string_t *s, string_t *value);
+
+/// @brief Sets the value of a string to the given formatted string (using asprintf)
+/// @param s The string
+/// @param format The format string
+/// @param ... The format arguments
+void s_setfa(string_t *s, const char *format, ...) __attribute__((format(printf, 2, 3)));
+
+/// @brief Sets the value of a string to the given formatted string (using snprintf to reduce allocations)
+/// @param s The string
+/// @param max_len The maximum length of the formatted string
+/// @param format The format string
+/// @param ... The format arguments
+void s_setfn(string_t *s, uint32_t max_len, const char *format, ...) __attribute__((format(printf, 3, 4)));
 
 /// @brief Make sure the string has the capacity for len bytes
 /// @param s The string
@@ -202,21 +215,21 @@ string_t *s_cats_p(string_t *s, string_t *addition);
 /// @param s The string
 /// @param format The format string
 /// @param ... The format arguments
-void s_catfa(string_t *s, const char* format, ...) __attribute__((format(printf,2,3)));
+void s_catfa(string_t *s, const char *format, ...) __attribute__((format(printf, 2, 3)));
 
 /// @brief Concatenates s with a format string in place (using snprintf internally for less allocations)
 /// @param s The string
 /// @param max_format The maximum length of the format result
 /// @param format The format string
 /// @param ... The format arguments
-void s_catfn(string_t *s, uint32_t max_format, const char* format, ...) __attribute__((format(printf,3,4)));
+void s_catfn(string_t *s, uint32_t max_format, const char *format, ...) __attribute__((format(printf, 3, 4)));
 
 /// @brief Concatenates s with a format string and returns that (using asprintf internally)
 /// @param s The string
 /// @param format The format string
 /// @param ... The format arguments
 /// @return A newly allocated string that is the result of the concatenation
-string_t s_catfa_a(string_t *s, const char* format, ...) __attribute__((format(printf,2,3)));
+string_t s_catfa_a(string_t *s, const char *format, ...) __attribute__((format(printf, 2, 3)));
 
 /// @brief Concatenates s with a format string and returns that (using snprintf internally for less allocations)
 /// @param s The string
@@ -224,14 +237,14 @@ string_t s_catfa_a(string_t *s, const char* format, ...) __attribute__((format(p
 /// @param format The format string
 /// @param ... The format arguments
 /// @return A newly allocated string that is the result of the concatenation
-string_t s_catfn_a(string_t *s, uint32_t max_format, const char* format, ...) __attribute__((format(printf,3,4)));
+string_t s_catfn_a(string_t *s, uint32_t max_format, const char *format, ...) __attribute__((format(printf, 3, 4)));
 
 /// @brief Concatenates s with a format string and returns a new string from the string pool (using asprintf internally)
 /// @param s The string
 /// @param format The format string
 /// @param ... The format arguments
 /// @return A new string from the string pool that is the result of the concatenation
-string_t *s_catfa_p(string_t *s, const char* format, ...) __attribute__((format(printf,2,3)));
+string_t *s_catfa_p(string_t *s, const char *format, ...) __attribute__((format(printf, 2, 3)));
 
 /// @brief Concatenates s with a format string and returns a new string from the string pool (using snprintf internally for less allocations)
 /// @param s The string
@@ -239,7 +252,61 @@ string_t *s_catfa_p(string_t *s, const char* format, ...) __attribute__((format(
 /// @param format The format string
 /// @param ... The format arguments
 /// @return A new string from the string pool that is the result of the concatenation
-string_t *s_catfn_p(string_t *s, uint32_t max_format, const char* format, ...) __attribute__((format(printf,3,4)));
+string_t *s_catfn_p(string_t *s, uint32_t max_format, const char *format, ...) __attribute__((format(printf, 3, 4)));
+
+/// @brief Concatenate addition with s in place
+/// @param s The string
+/// @param addition The addition to the string
+void s_pre(string_t *s, const char *addition);
+
+/// @brief Concatenate addition with s and returns a new string
+/// @param s The string
+/// @param addition The addition to the string
+/// @return A string that is the result of concatenating s with addition
+string_t s_pre_a(string_t *s, const char *addition);
+
+/// @brief Concatenate addition with s and returns a new string (using the string pool)
+/// @param s The string
+/// @param addition The addition to the string
+/// @return A string that is the result of concatenating s with addition
+string_t *s_pre_p(string_t *s, const char *addition);
+
+/// @brief Concatenate addition with s in place
+/// @param s The string
+/// @param addition The addition to the string
+void s_pres(string_t *s, string_t *addition);
+
+/// @brief Concatenate addition with s and returns a new string
+/// @param s The string
+/// @param addition The addition to the string
+/// @return A string that is the result of concatenating s with addition
+string_t s_pres_a(string_t *s, string_t *addition);
+
+/// @brief Concatenate addition with s and returns a new string (using the string pool)
+/// @param s The string
+/// @param addition The addition to the string
+/// @return A string that is the result of concatenating s with addition
+string_t *s_pres_p(string_t *s, string_t *addition);
+
+/// @brief Concatenates a format string with s in place (using asprintf internally)
+/// @param s The string
+/// @param format The format string
+/// @param ... The format arguments
+void s_prefa(string_t *s, const char *format, ...) __attribute__((format(printf, 2, 3)));
+
+/// @brief Concatenates a format string with s and returns that (using asprintf internally)
+/// @param s The string
+/// @param format The format string
+/// @param ... The format arguments
+/// @return A newly allocated string that is the result of the concatenation
+string_t s_prefa_a(string_t *s, const char *format, ...) __attribute__((format(printf, 2, 3)));
+
+/// @brief Concatenates a format string with s and returns a new string from the string pool (using asprintf internally)
+/// @param s The string
+/// @param format The format string
+/// @param ... The format arguments
+/// @return A new string from the string pool that is the result of the concatenation
+string_t *s_prefa_p(string_t *s, const char *format, ...) __attribute__((format(printf, 2, 3)));
 
 /// @brief Allocates a new string using the current allocator from s->cstring and frees the string original
 /// @param s The string to take and free
@@ -249,7 +316,7 @@ char *s_take(string_t *s);
 /// @brief Copies a string from s->cstring into the buffer and frees the string original
 /// @param s The string to take and free
 /// @return A pointer to a copy of the strings data
-char *s_taken(string_t* s, char* buffer, uint32_t n);
+char *s_taken(string_t *s, char *buffer, uint32_t n);
 
 /// @brief Allocates a new string using the current allocator from s->cstring and returns that
 /// @param s The string to copy
@@ -259,7 +326,7 @@ char *s_copy_c(string_t *s);
 /// @brief Allocates a new string using the current allocator from s->cstring and returns that
 /// @param s The string to copy
 /// @return The c string of s copied into the buffer
-char *s_copy_cn(string_t* s, char* buffer, uint32_t n);
+char *s_copy_cn(string_t *s, char *buffer, uint32_t n);
 
 /// @brief Copies a string and allocates it using the current allocator
 /// @param s The string to copy
@@ -274,53 +341,53 @@ string_t *s_copy_p(string_t *s);
 /// @brief Trims all characters in trimmed from the right of s in place
 /// @param s The string
 /// @param trimmed The characters to be trimmed
-void s_trimr(string_t* s, const char* trimmed);
+void s_trimr(string_t *s, const char *trimmed);
 
 /// @brief Trims all characters in trimmed from the right of s and returns a new string
 /// @param s The string
 /// @param trimmed The characters to be trimmed
 /// @return The newly allocated string with the characters trimmed
-string_t s_trimr_a(string_t *s, const char* trimmed);
+string_t s_trimr_a(string_t *s, const char *trimmed);
 
 /// @brief Trims all characters in trimmed from the right of s and returns a string from the string pool
 /// @param s The string
 /// @param trimmed The characters to be trimmed
 /// @return The string from the string pool with all the characters trimmed
-string_t *s_trimr_p(string_t *s, const char* trimmed);
+string_t *s_trimr_p(string_t *s, const char *trimmed);
 
 /// @brief Trims all characters in trimmed from the left of s in place
 /// @param s The string
 /// @param trimmed The characters to be trimmed
-void s_triml(string_t* s, const char* trimmed);
+void s_triml(string_t *s, const char *trimmed);
 
 /// @brief Trims all characters in trimmed from the left of s and returns a new string
 /// @param s The string
 /// @param trimmed The characters to be trimmed
 /// @return The newly allocated string with the characters trimmed
-string_t s_triml_a(string_t *s, const char* trimmed);
+string_t s_triml_a(string_t *s, const char *trimmed);
 
 /// @brief Trims all characters in trimmed from the left of s and returns a string from the string pool
 /// @param s The string
 /// @param trimmed The characters to be trimmed
 /// @return The string from the string pool with all the characters trimmed
-string_t *s_triml_p(string_t *s, const char* trimmed);
+string_t *s_triml_p(string_t *s, const char *trimmed);
 
 /// @brief Trims all characters in trimmed from the left and right of s in place
 /// @param s The string
 /// @param trimmed The characters to be trimmed
-void s_trimlr(string_t* s, const char* trimmed);
+void s_trimlr(string_t *s, const char *trimmed);
 
 /// @brief Trims all characters in trimmed from the left and right of s and returns a new string
 /// @param s The string
 /// @param trimmed The characters to be trimmed
 /// @return The newly allocated string with the characters trimmed
-string_t s_trimlr_a(string_t *s, const char* trimmed);
+string_t s_trimlr_a(string_t *s, const char *trimmed);
 
 /// @brief Trims all characters in trimmed from the left and right of s and returns a string from the string pool
 /// @param s The string
 /// @param trimmed The characters to be trimmed
 /// @return The string from the string pool with all the characters trimmed
-string_t *s_trimlr_p(string_t *s, const char* trimmed);
+string_t *s_trimlr_p(string_t *s, const char *trimmed);
 
 // Utility macros
 

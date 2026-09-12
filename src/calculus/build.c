@@ -13,6 +13,7 @@
 #define _GNU_SOURCE
 
 #include <errno.h>
+#include <stdio.h>
 #include <stdlib.h>
 
 #include <fcntl.h>
@@ -134,11 +135,11 @@ static int extract_archive(const char *file, const char *directory)
         archive_entry_set_perm(entry, current_perms & ~0222);
         if ((result = archive_write_header(to, entry)))
         {
-            fprintf(stderr, "Warning reading entry %s: %s\n", temp, archive_error_string(to));
+            fprintf(stderr, "Warning reading entry %s: %s\n", temp->cstring, archive_error_string(to));
         }
         else if (archive_entry_size(entry) > 0 && (result = copy_archive(from, to)))
         {
-            fprintf(stderr, "Error writing entry %s\n", temp);
+            fprintf(stderr, "Error writing entry %s\n", temp->cstring);
         }
 
         s_free(temp);
@@ -236,10 +237,19 @@ static int copy_directory(const char *from_directory, const char *directory)
     return result;
 }
 
+/******************************************************************************
+ *
+ * TARBALL HANDLER
+ *
+ * build_tarball() - fetches a tarball from the url, verifies it's hash, and
+ *                   optionally extracts it
+ *
+ *****************************************************************************/
+
 static int build_tarball(fetch_tarball_derivative_t *tarball)
 {
     // static char fp_buffer[512 /* We can assume a lot less of a size here because there is a max size on paths*/];
-    string_t *filepath;
+    string_t *filepath = nullptr;
 
     int result = -1;
     CURL *curl = nullptr;
@@ -254,7 +264,7 @@ static int build_tarball(fetch_tarball_derivative_t *tarball)
     }
 
     // snprintf(fp_buffer, 512, "%s/%s", CALCULUS_STORE_DIRECTORY, get_derivative_node_name((derivative_header_t *)tarball));
-    filepath = s_fmt_p(512, "%/s%s", CALCULUS_STORE_DIRECTORY, get_derivative_node_name((derivative_header_t *)tarball));
+    filepath = s_fmt_p(512, CALCULUS_STORE_DIRECTORY "/%s", get_derivative_node_name((derivative_header_t *)tarball));
 
     if (!tarball->extract)
     {
@@ -371,34 +381,531 @@ done:
     return result;
 }
 
-static int build_standard(standard_derivative_t *standard)
+/******************************************************************************
+ *
+ * STANDARD BUILD HANDLER
+ *
+ * setup_uid_map() - Handles setting up the UID map in an unshare environment
+ * enter_unshare() - Enters the unshare environment of the build process, after
+ *                   stdin and stdout are set up
+ *
+ *****************************************************************************/
+
+static void setup_uid_map(uid_t uid, gid_t gid)
 {
-    static char fp_buffer[512 /* We can assume a lot less of a size here because there is a max size on paths*/];
-    static char log_buffer[512];
-    static char chroot_path_buffer[PATH_MAX];
-    static char store_path_buffer[PATH_MAX];
-
-    char *out_path = nullptr;
-
-    // We first create the build directory that will be our chroot
-    snprintf(fp_buffer, 512, "%s/%s", CALCULUS_BUILD_DIRECTORY, get_derivative_node_name(&standard->dheader));
-
-    if (asprintf(&out_path, "%s%s", fp_buffer, get_derivative_store_path(&standard->dheader)) == -1)
+    int fd = open("/proc/self/setgroups", O_WRONLY);
+    if (fd == -1)
     {
-        perror("asprintf");
+        fprintf(stderr, "Error setting up uid map (setgroups): %s\n", strerror(errno));
+        exit(EXIT_FAILURE);
+    }
+    if (write(fd, "deny", 4) == -1)
+    {
+        fprintf(stderr, "Error writing to uid map (setgroups): %s\n", strerror(errno));
+        exit(EXIT_FAILURE);
+    }
+    close(fd);
+
+    fd = open("/proc/self/uid_map", O_WRONLY);
+    if (fd == -1)
+    {
+        fprintf(stderr, "Error setting up uid map (uid_map): %s\n", strerror(errno));
+        exit(EXIT_FAILURE);
+    }
+    string_t *s = s_fmt_p(32, "0 %d 1\n", uid);
+    if (write(fd, s->cstring, s->length) == -1)
+    {
+        fprintf(stderr, "Error writing to uid map (uid_map): %s\n", strerror(errno));
+        exit(EXIT_FAILURE);
+    }
+    close(fd);
+
+    fd = open("/proc/self/gid_map", O_WRONLY);
+    if (fd == -1)
+    {
+        fprintf(stderr, "Error setting up uid map (gid_map): %s\n", strerror(errno));
+        exit(EXIT_FAILURE);
+    }
+    s_setfn(s, 32, "0 %d 1\n", gid);
+    if (write(fd, s->cstring, s->length) == -1)
+    {
+        fprintf(stderr, "Error writing to uid map (gid_map): %s\n", strerror(errno));
+        exit(EXIT_FAILURE);
+    }
+    s_free(s);
+    close(fd);
+}
+
+static void checked_mount(const char *source, const char *target, const char *filesystemtype, unsigned long mountflags, const void *data)
+{
+    if (mount(source, target, filesystemtype, mountflags, data) == -1)
+    {
+        fprintf(stderr, "Error mounting '%s' -> '%s': %s\n", source, target, strerror(errno));
+        exit(EXIT_FAILURE);
+    }
+}
+
+static void checked_mkdir(const char *target, mode_t permissions)
+{
+    if (mkdir(target, permissions) == -1)
+    {
+        fprintf(stderr, "Error creating '%s': %s\n", target, strerror(errno));
+        exit(EXIT_FAILURE);
+    }
+}
+
+static void mkd_mount(const char *source, const char *target, const char *filesystemtype, unsigned long mountflags, const void *data)
+{
+    checked_mkdir(target, 0755);
+    checked_mount(source, target, filesystemtype, mountflags, data);
+}
+
+static void checked_touch(const char *target, mode_t permissions)
+{
+    int fd = open(target, O_WRONLY | O_CREAT | O_CLOEXEC, permissions);
+    if (fd == -1)
+    {
+        fprintf(stderr, "Error creating '%s': %s\n", target, strerror(errno));
+        exit(EXIT_FAILURE);
+    }
+    close(fd);
+}
+
+static void mkf_mount(const char *source, const char *target, const char *filesystemtype, unsigned long mountflags, const void *data)
+{
+    checked_touch(target, 0666);
+    checked_mount(source, target, filesystemtype, mountflags, data);
+}
+
+static void mount_dependencies(standard_derivative_t *derivative, string_t *build_directory, string_t *bin_sh, string_t *bin_env, string_t *env_var)
+{
+    // First we create the directory to mount our dependencies into
+    string_t *filename = s_fmt_p(PATH_MAX, "%s" CALCULUS_TRUE_PREFIX, build_directory->cstring);
+    checked_mkdir(filename->cstring, 0755);
+
+    s_setfn(filename, PATH_MAX, "%s" CHROOT_STORE_DIRECTORY, build_directory->cstring);
+    checked_mkdir(filename->cstring, 0755);
+
+    s_cat(filename, "/");
+
+    // Then we go over every dependency
+    for (size_t i = 0; i < derivative->num_dependencies; i++)
+    {
+        string_t *local = s_cat_p(filename, get_derivative_node_name(&derivative->dheader));
+        string_t *target = s_own_p(get_derivative_store_path(&derivative->dheader));
+        string_t *temp = s_new_p(PATH_MAX);
+
+        // First mounting them
+        if (fs_isreg(local->cstring))
+        {
+            // We just mount this normally
+            mkf_mount(local->cstring, target->cstring, nullptr, MS_BIND | MS_RDONLY, nullptr);
+            goto cont;
+        }
+
+        if (!fs_isdir(local->cstring))
+        {
+            fprintf(stderr, "dependency %s is not a file or a directory\n", local->cstring);
+            exit(EXIT_FAILURE);
+        }
+
+        // Then checking for our /bin/sh or /bin/bash, and /bin/env files that we need to symlink eventually
+        if (bin_sh->length != 0)
+            goto check_env;
+
+        s_setfn(temp, PATH_MAX, "%s/bin/bash", local->cstring);
+        if (fs_exists(temp->cstring))
+        {
+            s_setfn(bin_sh, PATH_MAX, "%s/bin/bash", target->cstring);
+            goto check_env;
+        }
+
+        s_setfn(temp, PATH_MAX, "%s/bin/sh", local->cstring);
+        if (fs_exists(temp->cstring))
+            s_setfn(bin_sh, PATH_MAX, "%s/bin/sh", target->cstring);
+
+    check_env:
+        if (bin_env->length != 0)
+            goto cont;
+
+        s_setfn(temp, PATH_MAX, "%s/bin/env", local->cstring);
+        if (fs_exists(temp->cstring))
+            s_setfn(bin_env, PATH_MAX, "%s/bin/env", target->cstring);
+
+    cont:
+        if (env_var->length > 0)
+            s_cat(env_var, ":");
+        s_cats(env_var, target);
+
+        s_free(temp);
+        s_free(target);
+        s_free(local);
+    }
+}
+
+static void enter_jail(standard_derivative_t *derivative, string_t *build_directory)
+{
+    uid_t uid = getuid();
+    gid_t gid = getgid();
+    if (unshare(
+            // Let us
+            CLONE_NEWCGROUP |
+            CLONE_NEWIPC |
+            CLONE_NEWPID |
+            CLONE_NEWUTS |
+            CLONE_NEWNET |
+            CLONE_NEWUSER |
+            CLONE_NEWNS) == -1)
+    {
+        fprintf(stderr, "Error setting up unshare for %s: %s\n", derivative->name, strerror(errno));
+        exit(EXIT_FAILURE);
+    }
+    setup_uid_map(uid, gid);
+
+    pid_t builder = fork();
+    if (builder < 0)
+    {
+        fprintf(stderr, "Error forking builder process for %s: %s", derivative->name, strerror(errno));
+        exit(EXIT_FAILURE);
+    }
+    else if (builder == 0)
+    {
+        // Make sure we can't accidentally ruin mounts outside of this unshare
+        checked_mount("none", "/", NULL, MS_REC | MS_PRIVATE, nullptr);
+
+        // And mount our target root to itself for the pivot_root syscall
+        checked_mount(build_directory->cstring, build_directory->cstring, nullptr, MS_BIND | MS_REC, nullptr);
+
+        // Set up basic linux virtual filesystems
+
+        // /proc
+        string_t *filename = s_fmt_p(PATH_MAX, "%s/proc", build_directory->cstring);
+        mkd_mount("proc", filename->cstring, "proc", MS_NOSUID | MS_NODEV | MS_NOEXEC, nullptr);
+
+        // /sys
+        s_setfn(filename, PATH_MAX, "%s/sys", build_directory->cstring);
+        mkd_mount("sysfs", filename->cstring, "sysfs", MS_NOSUID | MS_NODEV | MS_NOEXEC, nullptr);
+
+        // /tmp
+        s_setfn(filename, PATH_MAX, "%s/tmp", build_directory->cstring);
+        mkd_mount("tmpfs", filename->cstring, "tmpfs", MS_NOSUID | MS_NODEV | MS_NOEXEC, nullptr);
+
+        // /dev
+        s_setfn(filename, PATH_MAX, "%s/dev", build_directory->cstring);
+        mkd_mount("tmpfs", filename->cstring, "tmpfs", MS_NOSUID | MS_NODEV | MS_NOEXEC, nullptr);
+
+        // Then some safe devices
+
+        // /dev/null
+        s_setfn(filename, PATH_MAX, "%s/dev/null", build_directory->cstring);
+        mkf_mount("/dev/null", filename->cstring, nullptr, MS_BIND, nullptr);
+
+        // /dev/zero
+        s_setfn(filename, PATH_MAX, "%s/dev/zero", build_directory->cstring);
+        mkf_mount("/dev/zero", filename->cstring, nullptr, MS_BIND, nullptr);
+
+        // /dev/random
+        s_setfn(filename, PATH_MAX, "%s/dev/random", build_directory->cstring);
+        mkf_mount("/dev/random", filename->cstring, nullptr, MS_BIND, nullptr);
+
+        // /dev/urandom
+        s_setfn(filename, PATH_MAX, "%s/dev/urandom", build_directory->cstring);
+        mkf_mount("/dev/urandom", filename->cstring, nullptr, MS_BIND, nullptr);
+
+        s_free(filename);
+
+        string_t *bin_sh = s_new_p(PATH_MAX);
+        string_t *bin_env = s_new_p(PATH_MAX);
+        string_t *env_var = s_new_p(STRING_DEFAULT_CAPACITY);
+
+        // Now let's bind mount our dependencies
+        mount_dependencies(derivative, build_directory, bin_sh, bin_env, env_var);
+
+        // Let's check the invariants of /bin/sh and /usr/bin/env being able to be symlinked to run the build script
+        if (bin_sh->length == 0)
+        {
+            fprintf(stderr, "No 'sh' or 'bash' program found in dependencies, the build script cannot be run\n");
+            exit(EXIT_FAILURE);
+        }
+
+        if (bin_env->length == 0)
+        {
+            fprintf(stderr, "No 'env' program found in dependencies, the build script cannot be run\n");
+            exit(EXIT_FAILURE);
+        }
+
+        // Now that we are past the point of anything that depends on the host filesystem, we can pivot root
+        // First by setting up where we are going to put our old root
+        string_t *old = s_cat_p(build_directory, "/old");
+        checked_mkdir(old->cstring, 0755);
+
+        // Then pivot
+        if (syscall(SYS_pivot_root, build_directory->cstring, old->cstring) == -1)
+        {
+            fprintf(stderr, "Error pivoting root: %s", strerror(errno));
+            exit(EXIT_FAILURE);
+        }
+        s_free(old);
+
+        // Then remove any way for the build script to affect our old root
+        if (umount2("/old", MNT_DETACH) == -1)
+        {
+            fprintf(stderr, "Error detaching old root: %s", strerror(errno));
+            exit(EXIT_FAILURE);
+        }
+
+        if (rmdir("/old") == -1)
+        {
+            fprintf(stderr, "Error deleting inert old root folder: %s", strerror(errno));
+            exit(EXIT_FAILURE);
+        }
+
+        // At this point we are a completely isolated "new" linux system from the host, so now we get ready to build
+
+        // First by creating the build folder
+        checked_mkdir("/build", 0755);
+        if (chdir("/build") == -1)
+        {
+            fprintf(stderr, "Error changing directory to build: %s", strerror(errno));
+            exit(EXIT_FAILURE);
+        }
+
+        // Then by creating the symlinks mentioned earlier
+        checked_mkdir("/bin", 0755);
+        if (symlink(bin_sh->cstring, "/bin/sh") == -1)
+        {
+            fprintf(stderr, "Error creating sh symlink: %s\n", strerror(errno));
+            exit(EXIT_FAILURE);
+        }
+        s_free(bin_sh);
+
+        checked_mkdir("/usr", 0755);
+        checked_mkdir("/usr/bin", 0755);
+        if (symlink(bin_env->cstring, "/usr/bin/env") == -1)
+        {
+            fprintf(stderr, "Error creating env symlink: %s\n", strerror(errno));
+            exit(EXIT_FAILURE);
+        }
+        s_free(bin_env);
+
+        // Then by creating our output directory
+        string_t *out = s_own_p(get_derivative_store_path(&derivative->dheader));
+
+        checked_mkdir(out->cstring, 0755);
+
+        // Then by creating our packages environment variable
+        s_pre(env_var, "packages=");
+
+        // Then by creating our output environment variable
+        s_pre(out, "out=");
+
+        // Then *finally* by running our command
+        char *env[] = {env_var->cstring, out->cstring, nullptr};
+        char *cmd[] = {"/bin/sh", "-c", derivative->build, nullptr};
+
+        execvpe(cmd[0], cmd, env);
+        fprintf(stderr, "Executing build command failed: %s", strerror(errno));
+        exit(EXIT_FAILURE);
+    }
+    else
+    {
+
+        int status, code = EXIT_FAILURE;
+        if (waitpid(builder, &status, 0) != -1)
+        {
+            if (WIFEXITED(status))
+            {
+                code = WEXITSTATUS(status);
+                if (code != EXIT_SUCCESS)
+                {
+                    fprintf(stderr, "Builder process returned %d\n", code);
+                }
+            }
+        }
+        else
+        {
+            fprintf(stderr, "Error waiting for builder to finish: %s\n", strerror(errno));
+        }
+
+        exit(code);
+    }
+}
+
+static int copy_file(FILE *from_file, FILE *to_file, char *buffer, size_t buffer_size)
+{
+    while (!feof(from_file))
+    {
+        if (ferror(from_file))
+        {
+            fprintf(stderr, "Error reading from file: %s\n", strerror(errno));
+            return EXIT_FAILURE;
+        }
+
+        size_t nread = fread(buffer, 1, buffer_size, from_file);
+        fwrite(buffer, 1, nread, to_file);
+        if (ferror(to_file))
+        {
+
+            fprintf(stderr, "Error writing to file: %s\n", strerror(errno));
+            return EXIT_FAILURE;
+        }
+    }
+    return EXIT_SUCCESS;
+}
+
+static int monitor_jail(standard_derivative_t *derivative, string_t *build_directory, pid_t jail_process, int jail_pipe)
+{
+    // A buffer specifically for monitoring the jail
+    static char monitor_buffer[4096];
+
+    int status, code = EXIT_FAILURE;
+
+    // 3 temporary strings that have to be deallocated at the end of the function
+    string_t *store = s_fmt_p(PATH_MAX, CALCULUS_STORE_DIRECTORY "/%s", get_derivative_node_name(&derivative->dheader));
+    string_t *out_path = s_fmt_p(PATH_MAX, "%s%s", build_directory->cstring, get_derivative_store_path(&derivative->dheader));
+    string_t *log = s_fmt_p(512, CALCULUS_LOGS_DIRECTORY "/%s.log", get_derivative_node_name(&derivative->dheader));
+
+    // int file_fd = open(log->cstring, O_WRONLY| O_CREAT | O_TRUNC, 0666);
+    FILE *log_file = fopen(log->cstring, "w+");
+    if (log_file == nullptr)
+    {
+        fprintf(stderr, "Warning, unable to create log file: %s\n", strerror(errno));
+        goto skip_logs;
+    }
+    FILE *jail_file = fdopen(jail_pipe, "r");
+    int copy_code = copy_file(jail_file, log_file, monitor_buffer, sizeof(monitor_buffer));
+    fclose(log_file);
+    fclose(jail_file);
+    if (copy_code != EXIT_SUCCESS)
+        fprintf(stderr, "Warning, logs may be truncated\n");
+skip_logs:
+    if (waitpid(jail_process, &status, 0) != -1)
+    {
+        if (WIFEXITED(status))
+        {
+            code = WEXITSTATUS(status);
+            if (code != EXIT_SUCCESS)
+            {
+                fprintf(stderr, "Builder process returned %d\n", code);
+            }
+        }
+    }
+    else
+    {
+        fprintf(stderr, "Error waiting for jail process to finish: %s\n", strerror(errno));
         return -1;
     }
 
-    // We then make sure no build directory currently exists
-    fs_rmdir(fp_buffer);
-    if (fs_ensure_dir(fp_buffer) == -1)
+    if (code == EXIT_SUCCESS)
+    {
+        // let us copy the file into our store and recursively make it readonly using libarchive
+        // snprintf(store_path_buffer, PATH_MAX, CALCULUS_STORE_DIRECTORY "/%s", get_derivative_node_name(&standard->dheader));
+
+        if (fs_isdir(out_path->cstring))
+        {
+            if (mkdir(store->cstring, 0777) == -1)
+            {
+                fprintf(stderr, "error creating directory in store: %s\n", strerror(errno));
+                code = EXIT_FAILURE;
+                goto true_finalize;
+            }
+
+            if (copy_directory(out_path->cstring, store->cstring) != ARCHIVE_OK)
+            {
+                code = EXIT_FAILURE;
+                goto true_finalize;
+            }
+
+            if (chmod(store->cstring, 0555) == -1)
+            {
+                fprintf(stderr, "error chmod'ing the directory in store: %s\n", strerror(errno));
+                code = EXIT_FAILURE;
+                goto true_finalize;
+            }
+        }
+        else if (fs_isreg(out_path->cstring))
+        {
+            struct stat stat_buf;
+            if (stat(out_path->cstring, &stat_buf) == -1)
+            {
+                fprintf(stderr, "Error stat()ing output file: %s\n", strerror(errno));
+                code = EXIT_FAILURE;
+                goto true_finalize;
+            }
+
+            FILE *store_file = fopen(store->cstring, "w+");
+            if (store_file == nullptr)
+            {
+                fprintf(stderr, "Error opening store file for writing: %s\n", strerror(errno));
+                code = EXIT_FAILURE;
+                goto true_finalize;
+            }
+
+            FILE *from_file = fopen(out_path->cstring, "r+");
+            if (from_file == nullptr)
+            {
+                fprintf(stderr, "Error opening output file for reading: %s\n", strerror(errno));
+                code = EXIT_FAILURE;
+                goto true_finalize;
+            }
+
+            code = copy_file(from_file, store_file, monitor_buffer, sizeof(monitor_buffer));
+            fclose(from_file);
+            fclose(store_file);
+            if (code != EXIT_SUCCESS)
+                goto true_finalize;
+
+            if (chmod(store->cstring, ((S_IXUSR & stat_buf.st_mode) > 0) ? 0555 : 0444) == -1)
+            {
+                fprintf(stderr, "Error chmod'ing the store file: %s\n", strerror(errno));
+                code = EXIT_FAILURE;
+            }
+            goto true_finalize;
+        }
+        else
+        {
+            fprintf(stderr, "Output file is neither a regular file nor directory!\n");
+            code = EXIT_FAILURE;
+            goto true_finalize;
+        }
+    }
+true_finalize:
+    if (code != EXIT_SUCCESS)
+    {
+        fprintf(stderr, "Build failed - logs are at %s\n", log->cstring);
+        string_t *cmd = s_fmt_p(PATH_MAX, "tail -n20 %s 2>&1", log->cstring);
+        FILE *tail = popen(cmd->cstring, "r");
+        s_free(cmd);
+        if (tail == nullptr)
+        {
+            fprintf(stderr, "Cannot tail the logs...: %s", strerror(errno));
+            goto cleanup;
+        }
+        fprintf(stderr, "Last 20 lines of the logs:\n");
+        copy_file(tail, stderr, monitor_buffer, sizeof(monitor_buffer));
+        pclose(tail);
+    }
+cleanup:
+    s_free(store);
+    s_free(out_path);
+    s_free(log);
+    return code;
+}
+
+static int build_standard(standard_derivative_t *standard)
+{
+
+    string_t *build_directory = s_fmt_p(512, "%s/%s", CALCULUS_BUILD_DIRECTORY, get_derivative_node_name(&standard->dheader));
+
+    // We then remake any build directory
+    fs_rmdir(build_directory->cstring);
+    if (fs_ensure_dir(build_directory->cstring) == -1)
     {
         fprintf(stderr, "Error creating build directory for %s: %s\n", standard->name, strerror(errno));
         return -1;
     }
 
-    // We fork to set up the build process
-
+    // We set up pipes to capture our build proceses stdout
     int pipefd[2];
 
     if (pipe(pipefd) == -1)
@@ -406,16 +913,18 @@ static int build_standard(standard_derivative_t *standard)
         fprintf(stderr, "Error opening log pipe for building derivative %s: %s", standard->name, strerror(errno));
         exit(EXIT_FAILURE);
     }
+
+    // We then fork to set up the build process
     pid_t child = fork();
     if (child < 0)
     {
         fprintf(stderr, "Fork failed when building directory for %s: %s\n", standard->name, strerror(errno));
-        fs_rmdir(fp_buffer);
+        fs_rmdir(build_directory->cstring);
         return -1;
     }
     else if (child == 0)
     {
-
+        // We are the process that will eventually build everything, so we quickly set up our monitoring stuff
         close(pipefd[0]);
         dup2(pipefd[1], STDOUT_FILENO);
         dup2(pipefd[1], STDERR_FILENO);
@@ -430,617 +939,28 @@ static int build_standard(standard_derivative_t *standard)
         dup2(devnull, STDIN_FILENO);
         close(devnull);
 
-        // set up UID maps or else we can't create a tmpfs
-        uid_t uid = getuid();
-        gid_t gid = getgid();
-        // We are the child here
-
-        if (unshare(
-                // Let us
-                CLONE_NEWCGROUP |
-                CLONE_NEWIPC |
-                CLONE_NEWPID |
-                CLONE_NEWUTS |
-                CLONE_NEWNET |
-                CLONE_NEWUSER |
-                CLONE_NEWNS) == -1)
-        {
-            fprintf(stderr, "Error setting up unshare for %s: %s\n", standard->name, strerror(errno));
-            exit(EXIT_FAILURE);
-        }
-
-        char map_buf[32];
-        int fd = open("/proc/self/setgroups", O_WRONLY);
-        if (fd == -1)
-        {
-            fprintf(stderr, "Error setting up uid map (setgroups) for %s: %s", standard->name, strerror(errno));
-            exit(EXIT_FAILURE);
-        }
-        if (write(fd, "deny", 4) == -1)
-        {
-            fprintf(stderr, "Error writing to uid map (setgroups) for %s: %s", standard->name, strerror(errno));
-            exit(EXIT_FAILURE);
-        }
-        close(fd);
-
-        fd = open("/proc/self/uid_map", O_WRONLY);
-        if (fd == -1)
-        {
-            fprintf(stderr, "Error setting up uid map (uid_map) for %s: %s", standard->name, strerror(errno));
-            exit(EXIT_FAILURE);
-        }
-        snprintf(map_buf, sizeof(map_buf), "0 %d 1\n", uid);
-        if (write(fd, map_buf, strlen(map_buf)) == -1)
-        {
-            fprintf(stderr, "Error writing to uid map (uid_map) for %s: %s", standard->name, strerror(errno));
-            exit(EXIT_FAILURE);
-        }
-        close(fd);
-
-        fd = open("/proc/self/gid_map", O_WRONLY);
-        if (fd == -1)
-        {
-            fprintf(stderr, "Error setting up uid map (gid_map) for %s: %s", standard->name, strerror(errno));
-            exit(EXIT_FAILURE);
-        }
-        snprintf(map_buf, sizeof(map_buf), "0 %d 1\n", gid);
-        if (write(fd, map_buf, strlen(map_buf)) == -1)
-        {
-            fprintf(stderr, "Error writing to uid map (gid_map) for %s: %s", standard->name, strerror(errno));
-            exit(EXIT_FAILURE);
-        }
-        close(fd);
-
-        pid_t builder = fork();
-        if (builder < 0)
-        {
-            fprintf(stderr, "Error forking builder process for %s: %s", standard->name, strerror(errno));
-            exit(EXIT_FAILURE);
-        }
-        else if (builder == 0)
-        {
-
-            // WE HAVE TO DO ALL THIS SETUP IN THE FORKED PLACE
-
-            if (mount("none", "/", NULL, MS_REC | MS_PRIVATE, NULL) == -1)
-            {
-                fprintf(stderr, "Error making mounts private for %s: %s\n", standard->name, strerror(errno));
-                exit(EXIT_FAILURE);
-            }
-
-            if (mount(fp_buffer, fp_buffer, NULL, MS_BIND | MS_REC, NULL) == -1)
-            {
-                fprintf(stderr, "Error creating mount point for %s: %s\n", standard->name, strerror(errno));
-                exit(EXIT_FAILURE);
-            }
-
-            // Virtual file systems
-            snprintf(chroot_path_buffer, PATH_MAX, "%s/proc", fp_buffer);
-            if (mkdir(chroot_path_buffer, 0755) == -1)
-            {
-                fprintf(stderr, "Error creating proc filesystem for %s: %s\n", standard->name, strerror(errno));
-                exit(EXIT_FAILURE);
-            }
-            if (mount("proc", chroot_path_buffer, "proc", MS_NOSUID | MS_NODEV | MS_NOEXEC, NULL) == -1)
-            {
-                fprintf(stderr, "Error mounting %s for %s: %s\n", chroot_path_buffer, standard->name, strerror(errno));
-                exit(EXIT_FAILURE);
-            }
-
-            snprintf(chroot_path_buffer, PATH_MAX, "%s/sys", fp_buffer);
-            if (mkdir(chroot_path_buffer, 0755) == -1)
-            {
-                fprintf(stderr, "Error creating sys filesystem for %s: %s", standard->name, strerror(errno));
-                exit(EXIT_FAILURE);
-            }
-            if (mount("sysfs", chroot_path_buffer, "sysfs", MS_NOSUID | MS_NODEV | MS_NOEXEC, NULL) == -1)
-            {
-                fprintf(stderr, "Error mounting %s for %s: %s\n", chroot_path_buffer, standard->name, strerror(errno));
-                exit(EXIT_FAILURE);
-            }
-
-            snprintf(chroot_path_buffer, PATH_MAX, "%s/tmp", fp_buffer);
-            if (mkdir(chroot_path_buffer, 0755) == -1)
-            {
-                fprintf(stderr, "Error creating tmp filesystem for %s: %s\n", standard->name, strerror(errno));
-                exit(EXIT_FAILURE);
-            }
-            if (mount("tmpfs", chroot_path_buffer, "tmpfs", MS_NOSUID | MS_NODEV | MS_NOEXEC, "size=512M,mode=1777") == -1)
-            {
-                fprintf(stderr, "Error mounting %s for %s: %s\n", chroot_path_buffer, standard->name, strerror(errno));
-                exit(EXIT_FAILURE);
-            }
-
-            // safe devices
-            snprintf(chroot_path_buffer, PATH_MAX, "%s/dev", fp_buffer);
-
-            if (mkdir(chroot_path_buffer, 0755) == -1)
-            {
-                fprintf(stderr, "Error creating dev filesystem for %s: %s\n", standard->name, strerror(errno));
-                exit(EXIT_FAILURE);
-            }
-
-            if (mount("tmpfs", chroot_path_buffer, "tmpfs", MS_NOSUID | MS_NOATIME, "mode=0755,uid=0,gid=0") == -1)
-            {
-                fprintf(stderr, "Error mounting %s for %s: %s\n", chroot_path_buffer, standard->name, strerror(errno));
-                exit(EXIT_FAILURE);
-            }
-
-            snprintf(chroot_path_buffer, PATH_MAX, "%s/dev/null", fp_buffer);
-
-            // debug("%s", chroot_path_buffer);
-            int nul_fd = open(chroot_path_buffer, O_WRONLY | O_CREAT | O_CLOEXEC, 0666);
-            if (nul_fd == -1)
-            {
-                fprintf(stderr, "Error creating %s for %s: %s\n", chroot_path_buffer, standard->name, strerror(errno));
-                exit(EXIT_FAILURE);
-            }
-            close(nul_fd);
-
-            if (mount("/dev/null", chroot_path_buffer, NULL, MS_BIND, NULL) == -1)
-            {
-                fprintf(stderr, "Error mounting %s for %s: %s\n", chroot_path_buffer, standard->name, strerror(errno));
-                exit(EXIT_FAILURE);
-            }
-
-            snprintf(chroot_path_buffer, PATH_MAX, "%s/dev/zero", fp_buffer);
-
-            int zer_fd = open(chroot_path_buffer, O_WRONLY | O_CREAT | O_CLOEXEC, 0666);
-            if (zer_fd == -1)
-            {
-                fprintf(stderr, "Error creating %s for %s: %s\n", chroot_path_buffer, standard->name, strerror(errno));
-                exit(EXIT_FAILURE);
-            }
-            close(zer_fd);
-
-            if (mount("/dev/zero", chroot_path_buffer, NULL, MS_BIND, NULL) == -1)
-            {
-                fprintf(stderr, "Error mounting %s for %s: %s\n", chroot_path_buffer, standard->name, strerror(errno));
-                exit(EXIT_FAILURE);
-            }
-
-            snprintf(chroot_path_buffer, PATH_MAX, "%s/dev/random", fp_buffer);
-
-            int rnd_fd = open(chroot_path_buffer, O_WRONLY | O_CREAT | O_CLOEXEC, 0666);
-            if (rnd_fd == -1)
-            {
-                fprintf(stderr, "Error creating %s for %s: %s\n", chroot_path_buffer, standard->name, strerror(errno));
-                exit(EXIT_FAILURE);
-            }
-            close(rnd_fd);
-
-            if (mount("/dev/random", chroot_path_buffer, NULL, MS_BIND, NULL) == -1)
-            {
-                fprintf(stderr, "Error mounting %s for %s: %s\n", chroot_path_buffer, standard->name, strerror(errno));
-                exit(EXIT_FAILURE);
-            }
-
-            snprintf(chroot_path_buffer, PATH_MAX, "%s/dev/urandom", fp_buffer);
-
-            int urnd_fd = open(chroot_path_buffer, O_WRONLY | O_CREAT | O_CLOEXEC, 0666);
-            if (urnd_fd == -1)
-            {
-                fprintf(stderr, "Error creating %s for %s: %s\n", chroot_path_buffer, standard->name, strerror(errno));
-                exit(EXIT_FAILURE);
-            }
-            close(urnd_fd);
-
-            if (mount("/dev/urandom", chroot_path_buffer, NULL, MS_BIND, NULL) == -1)
-            {
-                fprintf(stderr, "Error mounting %s for %s: %s\n", chroot_path_buffer, standard->name, strerror(errno));
-                exit(EXIT_FAILURE);
-            }
-
-            // So now we bind mount our dependencies
-            char *sh_path = nullptr;
-            char *env_path = nullptr;
-
-            snprintf(chroot_path_buffer, PATH_MAX, "%s" CALCULUS_TRUE_PREFIX, fp_buffer);
-            if (mkdir(chroot_path_buffer, 0555) == -1)
-            {
-                fprintf(stderr, "Error creating %s directory for %s: %s\n", CALCULUS_TRUE_PREFIX, standard->name, strerror(errno));
-                exit(EXIT_FAILURE);
-            }
-
-            snprintf(chroot_path_buffer, PATH_MAX, "%s" CHROOT_STORE_DIRECTORY, fp_buffer);
-            if (mkdir(chroot_path_buffer, 0555) == -1)
-            {
-                fprintf(stderr, "Error creating %s directory for %s: %s\n", CHROOT_STORE_DIRECTORY, standard->name, strerror(errno));
-                exit(EXIT_FAILURE);
-            }
-
-            char **packages = nullptr;
-            size_t combined_count = 0;
-
-            for (size_t i = 0; i < standard->num_dependencies; i++)
-            {
-                // Now we bind all our dependencies
-                derivative_header_t *dep = standard->dependencies[i];
-                snprintf(store_path_buffer, PATH_MAX, CALCULUS_STORE_DIRECTORY "/%s", get_derivative_node_name(dep));
-                snprintf(chroot_path_buffer, PATH_MAX, "%s" CHROOT_STORE_DIRECTORY "/%s", fp_buffer, get_derivative_node_name(dep));
-                if (fs_isreg(store_path_buffer))
-                {
-                    // This is a store path, we just want to bind and continue
-                    int fd = open(chroot_path_buffer, O_WRONLY | O_CREAT, 0644);
-                    if (fd == -1)
-                    {
-                        fprintf(stderr, "Error creating dependency %s for %s: %s\n", chroot_path_buffer, standard->name, strerror(errno));
-                        exit(EXIT_FAILURE);
-                    }
-                    close(fd);
-
-                    if (mount(store_path_buffer, chroot_path_buffer, nullptr, MS_BIND | MS_RDONLY, nullptr) == -1)
-                    {
-                        fprintf(stderr, "Error binding dependency %s for %s: %s\n", chroot_path_buffer, standard->name, strerror(errno));
-                        exit(EXIT_FAILURE);
-                    }
-                    goto add_to_env_var;
-                }
-
-                if (!fs_isdir(store_path_buffer))
-                {
-                    fprintf(stderr, "Error binding dependency %s for %s: dependency is not a file or directory\n", store_path_buffer, standard->name);
-                    exit(EXIT_FAILURE);
-                }
-
-                if (mkdir(chroot_path_buffer, 0644) == -1)
-                {
-                    fprintf(stderr, "Error creating dependency %s for %s: %s\n", chroot_path_buffer, standard->name, strerror(errno));
-                    exit(EXIT_FAILURE);
-                }
-
-                if (mount(store_path_buffer, chroot_path_buffer, nullptr, MS_BIND | MS_RDONLY, nullptr) == -1)
-                {
-                    fprintf(stderr, "Error binding dependency %s for %s: %s\n", chroot_path_buffer, standard->name, strerror(errno));
-                    exit(EXIT_FAILURE);
-                }
-
-                // Collect the 2 things we need to make symlinks for
-                if (sh_path == nullptr)
-                {
-                    snprintf(chroot_path_buffer, PATH_MAX, CALCULUS_STORE_DIRECTORY "/%s/bin/bash", get_derivative_node_name(dep));
-                    if (fs_exists(chroot_path_buffer))
-                    {
-                        if (asprintf(&sh_path, "%s/bin/bash", get_derivative_store_path(dep)) == -1)
-                        {
-                            // These shouldn't fail so
-                            perror("asprintf");
-                            exit(EXIT_FAILURE);
-                        }
-                    }
-                    else
-                    {
-                        snprintf(chroot_path_buffer, PATH_MAX, CALCULUS_STORE_DIRECTORY "/%s/bin/sh", get_derivative_node_name(dep));
-                        if (fs_exists(chroot_path_buffer))
-                        {
-                            if (asprintf(&sh_path, "%s/bin/sh", get_derivative_store_path(dep)) == -1)
-                            {
-                                perror("asprintf");
-                                exit(EXIT_FAILURE);
-                            }
-                        }
-                    }
-                }
-
-                if (env_path == nullptr)
-                {
-                    snprintf(chroot_path_buffer, PATH_MAX, CALCULUS_STORE_DIRECTORY "/%s/bin/env", get_derivative_node_name(dep));
-
-                    if (fs_exists(chroot_path_buffer))
-                    {
-                        if (asprintf(&env_path, "%s/bin/env", get_derivative_store_path(dep)) == -1)
-                        {
-                            perror("asprintf");
-                            exit(EXIT_FAILURE);
-                        }
-                    }
-                }
-            add_to_env_var:
-                char *pkg = strdup(get_derivative_store_path(dep));
-                combined_count += strlen(pkg) + 1;
-                arrpush(packages, pkg);
-            }
-
-            if (env_path == nullptr)
-            {
-                fprintf(stderr, "dependencies for %s don't contain an env binary, this is unsupported!\n", standard->name);
-                exit(EXIT_FAILURE);
-            }
-
-            if (sh_path == nullptr)
-            {
-                fprintf(stderr, "dependencies for %s don't contain an sh/bash binary, this is unsupported!\n", standard->name);
-                exit(EXIT_FAILURE);
-            }
-
-            // Now we set up our /bin/sh and /usr/bin/env parent folders
-            snprintf(chroot_path_buffer, PATH_MAX, "%s/bin", fp_buffer);
-            if (mkdir(chroot_path_buffer, 0777) == -1)
-            {
-                fprintf(stderr, "Error creating bin folder for %s: %s\n", standard->name, strerror(errno));
-                exit(EXIT_FAILURE);
-            }
-
-            snprintf(chroot_path_buffer, PATH_MAX, "%s/usr", fp_buffer);
-            if (mkdir(chroot_path_buffer, 0777) == -1)
-            {
-                fprintf(stderr, "Error creating usr folder for %s: %s\n", standard->name, strerror(errno));
-                exit(EXIT_FAILURE);
-            }
-
-            snprintf(chroot_path_buffer, PATH_MAX, "%s/usr/bin", fp_buffer);
-            if (mkdir(chroot_path_buffer, 0777) == -1)
-            {
-                fprintf(stderr, "Error creating usr/bin folder for %s: %s\n", standard->name, strerror(errno));
-                exit(EXIT_FAILURE);
-            }
-
-            snprintf(chroot_path_buffer, PATH_MAX, "%s/usr/bin/env", fp_buffer);
-
-            // And create the build folder
-            snprintf(chroot_path_buffer, PATH_MAX, "%s/build", fp_buffer);
-            if (mkdir(chroot_path_buffer, 0777) == -1)
-            {
-                fprintf(stderr, "Error creating build folder for %s: %s\n", standard->name, strerror(errno));
-                exit(EXIT_FAILURE);
-            }
-
-            // Then create the output directory as well
-            snprintf(chroot_path_buffer, PATH_MAX, "%s%s", fp_buffer, get_derivative_store_path(&standard->dheader));
-            if (mkdir(chroot_path_buffer, 0777) == -1)
-            {
-                fprintf(stderr, "Error creating output folder for %s: %s\n", standard->name, strerror(errno));
-                exit(EXIT_FAILURE);
-            }
-
-            // NOW THAT WE ARE HERE, WE PIVOT SETUP SYMLINKS AND EXEC
-
-            snprintf(chroot_path_buffer, PATH_MAX, "%s/old", fp_buffer);
-            if (mkdir(chroot_path_buffer, 0777) == -1)
-            {
-                fprintf(stderr, "Error creating old root folder for %s: %s\n", standard->name, strerror(errno));
-                exit(EXIT_FAILURE);
-            }
-
-            if (syscall(SYS_pivot_root, fp_buffer, chroot_path_buffer) == -1)
-            {
-                fprintf(stderr, "Error pivoting root for %s: %s\n", standard->name, strerror(errno));
-                exit(EXIT_FAILURE);
-            }
-
-            if (chdir("/build") == -1)
-            {
-                fprintf(stderr, "Error chdiring for %s: %s\n", standard->name, strerror(errno));
-                exit(EXIT_FAILURE);
-            }
-
-            if (umount2("/old", MNT_DETACH) == -1)
-            {
-                fprintf(stderr, "Error umounting old root for %s: %s\n", standard->name, strerror(errno));
-                exit(EXIT_FAILURE);
-            }
-            rmdir("/old");
-
-            // SETUP THE SYMLINKS
-            if (symlink(sh_path, "/bin/sh") == -1)
-            {
-                fprintf(stderr, "Error creating sh symlink for %s: %s\n", standard->name, strerror(errno));
-                exit(EXIT_FAILURE);
-            }
-
-            if (symlink(env_path, "/usr/bin/env") == -1)
-            {
-                fprintf(stderr, "Error creating env symlink for %s: %s\n", standard->name, strerror(errno));
-                exit(EXIT_FAILURE);
-            }
-
-            // TODO: Make this more efficient
-            char *packages_var = malloc(strlen("packages=") + combined_count + 1);
-            strcpy(packages_var, "packages=");
-            for (size_t i = 0; i < (size_t)arrlen(packages); i++)
-            {
-                if (i > 0)
-                {
-                    strcat(packages_var, ":");
-                }
-                strcat(packages_var, packages[i]);
-            }
-
-            char *out_var = nullptr;
-            if (asprintf(&out_var, "out=%s", get_derivative_store_path(&standard->dheader)) == -1)
-            {
-                perror("asprintf");
-                exit(EXIT_FAILURE);
-            }
-
-            // This is the environment
-            char *env[] = {packages_var, out_var, nullptr};
-            char *cmd[] = {"/bin/sh", "-c", standard->build, nullptr};
-
-            execvpe(cmd[0], cmd, env);
-            perror("execvpe");
-            exit(EXIT_FAILURE);
-        }
-        else
-        {
-            int status, code = EXIT_FAILURE;
-            if (waitpid(child, &status, 0) != -1)
-            {
-                if (WIFEXITED(status))
-                {
-                    code = WEXITSTATUS(status);
-                    if (code != EXIT_SUCCESS)
-                    {
-                        fprintf(stderr, "Builder process returned %d\n", code);
-                    }
-                }
-            }
-            else
-            {
-                fprintf(stderr, "Error waiting for builder to finish for %s: %s\n", standard->name, strerror(errno));
-            }
-
-            exit(code);
-        }
+        // Then enter jail
+        enter_jail(standard, build_directory);
+        unreachable();
     }
     else
     {
         close(pipefd[1]);
-
-        // Let's save the log here
-        int status, code = EXIT_FAILURE;
-        snprintf(log_buffer, 512, "%s/%s.log", CALCULUS_LOGS_DIRECTORY, get_derivative_node_name(&standard->dheader));
-        int file_fd = open(log_buffer, O_WRONLY | O_CREAT | O_TRUNC, 0666);
-        ssize_t n;
-        if (file_fd == -1)
-        {
-            fprintf(stderr, "Warning, unable to create logs for %s: %s\n", standard->name, strerror(errno));
-            goto skip_logs;
-        }
-
-        // Let's just reuse the store path buffer
-        while ((n = read(pipefd[0], store_path_buffer, PATH_MAX)) > 0)
-        {
-            char *ptr = store_path_buffer;
-            while (n > 0)
-            {
-                ssize_t written = write(file_fd, ptr, n);
-                if (written < 0)
-                {
-                    fprintf(stderr, "Warning, logs possibly truncated for %s: %s\n", standard->name, strerror(errno));
-                    close(file_fd);
-                    goto finalize;
-                }
-                n -= written;
-                ptr += written;
-            }
-        }
-
-        if (n < 0)
-        {
-            fprintf(stderr, "Warning, logs possibly truncated for %s: %s\n", standard->name, strerror(errno));
-        }
-        close(file_fd);
-    skip_logs:
-
-        if (waitpid(child, &status, 0) != -1)
-        {
-            if (WIFEXITED(status))
-            {
-                code = WEXITSTATUS(status);
-                if (code != EXIT_SUCCESS)
-                {
-                    fprintf(stderr, "Builder process returned %d\n", code);
-                }
-            }
-        }
-        else
-        {
-            fprintf(stderr, "Error waiting for builder to finish for %s: %s\n", standard->name, strerror(errno));
-
-            // Remove the build folder as soon as we can
-            fs_rmdir(fp_buffer);
-            return -1;
-        }
-        // Let's save the log either way
-
-    finalize:
-        if (code == EXIT_SUCCESS)
-        {
-            // let us copy the file into our store and recursively make it readonly using libarchive
-            snprintf(store_path_buffer, PATH_MAX, CALCULUS_STORE_DIRECTORY "/%s", get_derivative_node_name(&standard->dheader));
-            if (fs_isdir(out_path))
-            {
-                if (mkdir(store_path_buffer, 0777) == -1)
-                {
-                    fprintf(stderr, "error creating directory in store: %s\n", strerror(errno));
-                    code = EXIT_FAILURE;
-                    goto true_finalize;
-                }
-
-                if (copy_directory(out_path, store_path_buffer) != ARCHIVE_OK)
-                {
-                    code = EXIT_FAILURE;
-                    goto true_finalize;
-                }
-
-                if (chmod(store_path_buffer, 0555) == -1)
-                {
-                    fprintf(stderr, "error chmod'ing the directory in store: %s\n", strerror(errno));
-                    code = EXIT_FAILURE;
-                    goto true_finalize;
-                }
-            }
-            else if (fs_isreg(out_path))
-            {
-                struct stat stat_buf;
-                if (stat(out_path, &stat_buf) == -1)
-                {
-                    fprintf(stderr, "Error stat()ing output file: %s\n", strerror(errno));
-                    code = EXIT_FAILURE;
-                    goto true_finalize;
-                }
-
-                FILE *store_file = fopen(store_path_buffer, "w+");
-                if (store_file == nullptr)
-                {
-                    fprintf(stderr, "Error opening store file for writing: %s\n", strerror(errno));
-                    code = EXIT_FAILURE;
-                    goto true_finalize;
-                }
-
-                FILE *from_file = fopen(out_path, "r+");
-                if (from_file == nullptr)
-                {
-                    fprintf(stderr, "Error opening output file for reading: %s\n", strerror(errno));
-                    code = EXIT_FAILURE;
-                    goto true_finalize;
-                }
-
-                // This should just be a simple file->file transfer
-                while (!feof(from_file))
-                {
-                    if (ferror(from_file))
-                    {
-                        fprintf(stderr, "Error reading from output file: %s\n", strerror(errno));
-                        code = EXIT_FAILURE;
-                        goto true_finalize;
-                    }
-
-                    size_t nread = fread(chroot_path_buffer, 1, PATH_MAX, from_file);
-                    fwrite(chroot_path_buffer, 1, nread, store_file);
-                    if (ferror(store_file))
-                    {
-
-                        fprintf(stderr, "Error writing to store file: %s\n", strerror(errno));
-                        code = EXIT_FAILURE;
-                        goto true_finalize;
-                    }
-                }
-                fclose(from_file);
-                fclose(store_file);
-
-                chmod(store_path_buffer, ((S_IXUSR & stat_buf.st_mode) > 0) ? 0555 : 0444);
-                goto true_finalize;
-            }
-            else
-            {
-                fprintf(stderr, "Output file is neither a regular file nor directory!\n");
-                code = EXIT_FAILURE;
-                goto true_finalize;
-            }
-        }
-    true_finalize:
-        fs_rmdir(fp_buffer);
-        if (code != EXIT_SUCCESS)
-        {
-            fprintf(stderr, "Build failed - logs are at %s\n", log_buffer);
-            return -1;
-        }
+        int return_code = monitor_jail(standard, build_directory, child, pipefd[0]);
+        fs_rmdir(build_directory->cstring);
+        s_free(build_directory);
+        return return_code;
     }
-
-    return 0;
 }
+
+/******************************************************************************
+ *
+ * BUILD DISPATCHER
+ *
+ * build_derivative() - Dispatches a derivative to be built by the appropriate
+ *                      build handler
+ *
+ *****************************************************************************/
 
 int build_derivative(derivative_header_t *to_build)
 {

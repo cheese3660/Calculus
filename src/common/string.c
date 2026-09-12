@@ -190,21 +190,48 @@ string_t s_wrap(char *buffer, uint32_t buffer_capacity)
     return result;
 }
 
-void s_set(string_t *s, const char* value)
+void s_set(string_t *s, const char *value)
 {
     s_setl(s, value, strlen(value));
 }
 
-void s_setl(string_t *s, const char* value, uint32_t len)
+void s_setl(string_t *s, const char *value, uint32_t len)
 {
     s_reserve(s, len);
     s->length = len;
     memcpy(s->cstring, value, len + 1 /* Null byte */);
 }
 
-void s_sets(string_t *s, string_t* value)
+void s_sets(string_t *s, string_t *value)
 {
     s_setl(s, value->cstring, value->length);
+}
+
+void s_setfa(string_t *s, const char *format, ...)
+{
+    va_list args;
+    va_start(args, format);
+    char *result;
+    int len = vasprintf(&result, format, args);
+    va_end(args);
+    if (len == -1)
+        panic("Error formatting string: %s", strerror(errno));
+    s_reserve(s, len);
+    memcpy(s->cstring, result, len + 1 /* Null byte */);
+    s->length = len;
+}
+
+void s_setfn(string_t *s, uint32_t max_len, const char *format, ...)
+{
+    s_reserve(s, max_len);
+
+    va_list args;
+    va_start(args, format);
+    int len = vsnprintf(s->cstring, max_len + 1 /* null byte */, format, args);
+    va_end(args);
+    if (len == -1)
+        panic("Error formatting string: %s", strerror(errno));
+    s->length = len;
 }
 
 void s_reserve(string_t *s, uint32_t len)
@@ -397,6 +424,108 @@ string_t *s_catfn_p(string_t *s, uint32_t max_format, const char *format, ...)
     return result;
 }
 
+void s_pre(string_t *s, const char *addition)
+{
+    uint32_t addition_len = strlen(addition);
+    s_reserve(s, s->length + addition_len);
+    memmove(s->cstring + addition_len, s->cstring, s->length + 1 /* Null byte */);
+    memcpy(s->cstring, addition, addition_len);
+    s->length += addition_len;
+}
+
+string_t s_pre_a(string_t *s, const char *addition)
+{
+    uint32_t addition_len = strlen(addition);
+    string_t result = s_new_a(s->length + addition_len);
+    memcpy(result.cstring, addition, addition_len);
+    memcpy(result.cstring + addition_len, s->cstring, s->length + 1 /* Null byte */);
+    result.length = s->length + addition_len;
+    return result;
+}
+
+string_t *s_pre_p(string_t *s, const char *addition)
+{
+    uint32_t addition_len = strlen(addition);
+    string_t *result = s_new_p(s->length + addition_len);
+    memcpy(result->cstring, addition, addition_len);
+    memcpy(result->cstring + addition_len, s->cstring, s->length + 1 /* Null byte */);
+    result->length = s->length + addition_len;
+    return result;
+}
+
+void s_pres(string_t *s, string_t *addition)
+{
+    s_reserve(s, s->length + addition->length);
+    memmove(s->cstring + addition->length, s->cstring, s->length + 1 /* Null byte */);
+    memcpy(s->cstring, addition->cstring, addition->length);
+    s->length += addition->length;
+}
+
+string_t s_pres_a(string_t *s, string_t *addition)
+{
+    string_t result = s_new_a(s->length + addition->length);
+    memcpy(result.cstring, addition->cstring, addition->length);
+    memcpy(result.cstring + addition->length, s->cstring, s->length + 1 /* Null byte */);
+    result.length = s->length + addition->length;
+    return result;
+}
+
+string_t *s_pres_p(string_t *s, string_t *addition)
+{
+    string_t *result = s_new_p(s->length + addition->length);
+    memcpy(result->cstring, addition->cstring, addition->length);
+    memcpy(result->cstring + addition->length, s->cstring, s->length + 1 /* Null byte */);
+    result->length = s->length + addition->length;
+    return result;
+}
+
+void s_prefa(string_t *s, const char *format, ...)
+{
+    va_list args;
+    va_start(args, format);
+    char *addition;
+    int addition_len = vasprintf(&addition, format, args);
+    va_end(args);
+    if (addition_len == -1)
+        panic("Error creating formatted string: %s", strerror(errno));
+    s_reserve(s, s->length + addition_len);
+    memmove(s->cstring + addition_len, s->cstring, s->length + 1 /* Null byte */);
+    memcpy(s->cstring, addition, addition_len);
+    s->length += addition_len;
+}
+
+string_t s_prefa_a(string_t *s, const char *format, ...)
+{
+    va_list args;
+    va_start(args, format);
+    char *addition;
+    int addition_len = vasprintf(&addition, format, args);
+    va_end(args);
+    if (addition_len == -1)
+        panic("Error creating formatted string: %s", strerror(errno));
+    string_t result = s_new_a(s->length + addition_len);
+    memcpy(result.cstring, addition, addition_len);
+    memcpy(result.cstring + addition_len, s->cstring, s->length + 1 /* Null byte */);
+    result.length = s->length + addition_len;
+    return result;
+}
+
+string_t *s_prefa_p(string_t *s, const char *format, ...)
+{
+    va_list args;
+    va_start(args, format);
+    char *addition;
+    int addition_len = vasprintf(&addition, format, args);
+    va_end(args);
+    if (addition_len == -1)
+        panic("Error creating formatted string: %s", strerror(errno));
+    string_t *result = s_new_p(s->length + addition_len);
+    memcpy(result->cstring, addition, addition_len);
+    memcpy(result->cstring + addition_len, s->cstring, s->length + 1 /* Null byte */);
+    result->length = s->length + addition_len;
+    return result;
+}
+
 char *s_take(string_t *s)
 {
     char *copy = s_current_alloc->alloc(nullptr, s->length + 1 /* Null byte */);
@@ -407,7 +536,7 @@ char *s_take(string_t *s)
     return copy;
 }
 
-char *s_taken(string_t* s, char* buffer, uint32_t n)
+char *s_taken(string_t *s, char *buffer, uint32_t n)
 {
     uint32_t n1 = s->length + 1;
     n = n > n1 ? n1 : n;
@@ -427,7 +556,7 @@ char *s_copy_c(string_t *s)
     return copy;
 }
 
-char *s_copy_cn(string_t *s, char* buffer, uint32_t n)
+char *s_copy_cn(string_t *s, char *buffer, uint32_t n)
 {
     uint32_t n1 = s->length + 1;
     n = n > n1 ? n1 : n;
