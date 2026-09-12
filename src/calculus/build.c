@@ -4,7 +4,7 @@
  *  author: Lexi Allen
  *  license: MIT
  *  last updated: 9/12/2026
- * 
+ *
  *  This file contains the implementation of the sandboxed builder system that
  *  is what takes a derivative recipe and creates its artifact in the store.
  *
@@ -35,6 +35,7 @@
 #include "common/archive.h"
 #include "common/debug.h"
 #include "common/fs.h"
+#include "common/string.h"
 
 /******************************************************************************
  *
@@ -46,7 +47,7 @@
  * extract_archive() - Extract an archive to a given directory, ensuring that
  *                     the archive is extracted readonly
  * copy_directory() - Copy 2 directories between eachother using libarchive
- * 
+ *
  *****************************************************************************/
 
 static void ensure_paths()
@@ -93,8 +94,6 @@ static int copy_archive(struct archive *from, struct archive *to)
     }
 }
 
-static char archive_fullpath[PATH_MAX * 2];
-static char archive_targetpath[PATH_MAX * 2];
 // Extract as readonly
 static int extract_archive(const char *file, const char *directory)
 {
@@ -120,26 +119,29 @@ static int extract_archive(const char *file, const char *directory)
     {
         const char *current_path = archive_entry_pathname(entry);
         mode_t current_perms = archive_entry_perm(entry);
-        snprintf(archive_fullpath, sizeof(archive_fullpath), "%s/%s", directory, current_path);
-        archive_entry_set_pathname(entry, archive_fullpath);
+        string_t *temp = s_fmt_p(PATH_MAX * 2, "%s/%s", directory, current_path);
+        archive_entry_set_pathname(entry, temp->cstring);
 
         const char *hardlink_target = archive_entry_hardlink(entry);
         if (hardlink_target != nullptr)
         {
-            snprintf(archive_targetpath, sizeof(archive_targetpath), "%s/%s", directory, hardlink_target);
-            archive_entry_set_hardlink(entry, archive_targetpath);
+            string_t *temp2 = s_fmt_p(PATH_MAX * 2, "%s/%s", directory, hardlink_target);
+            archive_entry_set_hardlink(entry, temp2->cstring);
+            s_free(temp2);
         }
 
         // Make the permissions readonly while extracting
         archive_entry_set_perm(entry, current_perms & ~0222);
         if ((result = archive_write_header(to, entry)))
         {
-            fprintf(stderr, "Warning reading entry %s: %s\n", archive_fullpath, archive_error_string(to));
+            fprintf(stderr, "Warning reading entry %s: %s\n", temp, archive_error_string(to));
         }
         else if (archive_entry_size(entry) > 0 && (result = copy_archive(from, to)))
         {
-            fprintf(stderr, "Error writing entry %s\n", archive_fullpath);
+            fprintf(stderr, "Error writing entry %s\n", temp);
         }
+
+        s_free(temp);
 
         archive_write_finish_entry(to);
     }
@@ -188,8 +190,9 @@ static int copy_directory(const char *from_directory, const char *directory)
         }
 
         mode_t current_perms = archive_entry_perm(entry);
-        snprintf(archive_fullpath, sizeof(archive_fullpath), "%s/%s", directory, current_path);
-        archive_entry_set_pathname(entry, archive_fullpath);
+        // snprintf(archive_fullpath, sizeof(archive_fullpath), "%s/%s", directory, current_path);
+        string_t *temp = s_fmt_p(PATH_MAX * 2, "%s/%s", directory, current_path);
+        archive_entry_set_pathname(entry, temp->cstring);
 
         const char *hardlink_target = archive_entry_hardlink(entry);
         if (hardlink_target != nullptr)
@@ -204,20 +207,23 @@ static int copy_directory(const char *from_directory, const char *directory)
                 }
             }
 
-            snprintf(archive_targetpath, sizeof(archive_targetpath), "%s/%s", directory, hardlink_target);
-            archive_entry_set_hardlink(entry, archive_targetpath);
+            string_t *temp2 = s_fmt_p(PATH_MAX * 2, "%s/%s", directory, hardlink_target);
+            archive_entry_set_hardlink(entry, temp2->cstring);
+            s_free(temp2);
         }
 
         // Make the permissions readonly while extracting
         archive_entry_set_perm(entry, current_perms & ~0222);
         if ((result = archive_write_header(to, entry)))
         {
-            fprintf(stderr, "Warning reading entry %s: %s\n", archive_fullpath, archive_error_string(to));
+            fprintf(stderr, "Warning reading entry %s: %s\n", temp->cstring, archive_error_string(to));
         }
         else if (archive_entry_size(entry) > 0 && (result = copy_archive(from, to)))
         {
-            fprintf(stderr, "Error writing entry %s\n", archive_fullpath);
+            fprintf(stderr, "Error writing entry %s\n", temp->cstring);
         }
+
+        s_free(temp);
 
         archive_write_finish_entry(to);
     }
@@ -232,7 +238,8 @@ static int copy_directory(const char *from_directory, const char *directory)
 
 static int build_tarball(fetch_tarball_derivative_t *tarball)
 {
-    static char fp_buffer[512 /* We can assume a lot less of a size here because there is a max size on paths*/];
+    // static char fp_buffer[512 /* We can assume a lot less of a size here because there is a max size on paths*/];
+    string_t *filepath;
 
     int result = -1;
     CURL *curl = nullptr;
@@ -246,11 +253,12 @@ static int build_tarball(fetch_tarball_derivative_t *tarball)
         goto done;
     }
 
-    snprintf(fp_buffer, 512, "%s/%s", CALCULUS_STORE_DIRECTORY, get_derivative_node_name((derivative_header_t *)tarball));
+    // snprintf(fp_buffer, 512, "%s/%s", CALCULUS_STORE_DIRECTORY, get_derivative_node_name((derivative_header_t *)tarball));
+    filepath = s_fmt_p(512, "%/s%s", CALCULUS_STORE_DIRECTORY, get_derivative_node_name((derivative_header_t *)tarball));
 
     if (!tarball->extract)
     {
-        outfile_name = fp_buffer;
+        outfile_name = filepath->cstring;
     }
     else
     {
@@ -292,9 +300,11 @@ static int build_tarball(fetch_tarball_derivative_t *tarball)
         fprintf(stderr, "error opening tarball %s after downloading: %s\n", tarball->url, strerror(errno));
         goto done;
     }
+
     sha256_t file_hash = sha256_hashf(fp);
     fclose(fp);
     fp = nullptr;
+
     if (sha256_cmp(&file_hash, &tarball->dheader.dhash) != 0)
     {
         fprintf(stderr, "tarball %s hash is not what was expected!\n", tarball->url);
@@ -320,37 +330,40 @@ static int build_tarball(fetch_tarball_derivative_t *tarball)
     }
 
     // Now let's make our directory
-    if (mkdir(fp_buffer, 0777) == -1)
+    if (mkdir(filepath->cstring, 0777) == -1)
     {
         fprintf(stderr, "error creating output directory for built tarball %s: %s\n", tarball->url, strerror(errno));
         remove(outfile_name);
-        goto done;
+        goto extract_done;
     }
 
-    if (extract_archive(outfile_name, fp_buffer) != ARCHIVE_OK)
+    if (extract_archive(outfile_name, filepath->cstring) != ARCHIVE_OK)
     {
-        fprintf(stderr, "error extracting tarball %s\n",tarball->url);
+        fprintf(stderr, "error extracting tarball %s\n", tarball->url);
         remove(outfile_name);
-        goto done;
+        goto extract_done;
     }
 
     // Mark as read only
-    chmod(fp_buffer, 0555);
+    if (chmod(filepath->cstring, 0555) == -1)
+    {
+        fprintf(stderr, "error changing mod of output directory: %s\n", strerror(errno));
+        goto extract_done;
+    }
+
     // And owned by root
-    if (chown(fp_buffer, 0, 0) == -1)
+    if (chown(filepath->cstring, 0, 0) == -1)
     {
         fprintf(stderr, "error changing owner of output directory: %s\n", strerror(errno));
-        remove(outfile_name);
-        goto done;
+        goto extract_done;
     }
-    result = 0;
-    goto done;
 
-    // We remove the original downloaded temp file
+    result = 0;
+extract_done:
     remove(outfile_name);
-
-    result = 0;
 done:
+    if (filepath)
+        s_free(filepath);
     if (fp)
         fclose(fp);
     if (curl)
@@ -931,7 +944,6 @@ static int build_standard(standard_derivative_t *standard)
         }
         // Let's save the log either way
 
-
     finalize:
         if (code == EXIT_SUCCESS)
         {
@@ -1026,7 +1038,7 @@ static int build_standard(standard_derivative_t *standard)
             return -1;
         }
     }
-    
+
     return 0;
 }
 
