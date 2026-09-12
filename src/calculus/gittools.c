@@ -7,8 +7,9 @@
  *
  *****************************************************************************/
 
-#include <git2.h>
 #include <stdio.h>
+
+#include <git2.h>
 
 #include "common/string.h"
 
@@ -56,6 +57,7 @@ cleanup:
     {
         const git_error *e = git_error_last();
         snprintf(error_msg, sizeof(error_msg), "%s", e ? e->message : "Unknown error");
+        stored_git_error = error_msg;
     }
 
     if (refspec) s_free(refspec);
@@ -84,7 +86,7 @@ int fetch_sha(const char* path, const char* url, const char* sha)
         goto cleanup;
 
     refspec = s_fmt_p(512, "%s:refs/heads/fetch-temp", sha);
-    char* specs_list[] = {refspec};
+    char* specs_list[] = {refspec->cstring};
 
     git_strarray specs = {};
     specs.strings = specs_list;
@@ -107,6 +109,7 @@ cleanup:
     {
         const git_error *e = git_error_last();
         snprintf(error_msg, sizeof(error_msg), "%s", e ? e->message : "Unknown error");
+        stored_git_error = error_msg;
     }
 
     if (refspec) s_free(refspec);

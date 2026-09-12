@@ -3,16 +3,17 @@
  *  archive.c
  *  author: Lexi Allen
  *  license: MIT
- *  last updated: 9/11/2026
+ *  last updated: 9/12/2026
  *
  *****************************************************************************/
 
-#include <sys/stat.h>
-#include <dirent.h>
 #include <stdlib.h>
-#include <linux/limits.h>
-#include <unistd.h>
+
+#include <dirent.h>
 #include <fcntl.h>
+#include <linux/limits.h>
+#include <sys/stat.h>
+#include <unistd.h>
 
 #include "common/archive.h"
 #include "common/debug.h"

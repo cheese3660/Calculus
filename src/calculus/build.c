@@ -17,36 +17,29 @@
 
 #define _GNU_SOURCE
 
-#include "common/fs.h"
-#include "common/debug.h"
+#include <errno.h>
+#include <stdlib.h>
+
+#include <fcntl.h>
+#include <grp.h>
+#include <sched.h>
+#include <sys/mount.h>
+#include <sys/stat.h>
+#include <sys/syscall.h>
+#include <sys/wait.h>
+#include <unistd.h>
+
+#include <archive.h>
+#include <archive_entry.h>
+#include <curl/curl.h>
+
+#include "thirdparty/stb_ds.h"
 
 #include "calculus/build.h"
 #include "calculus/paths.h"
-
-#include <curl/curl.h>
-
-#include <unistd.h>
-#include <stdlib.h>
-
-#include <sys/stat.h>
-
-#include <errno.h>
-
-#include <archive.h>
-
-#include <archive_entry.h>
-
-#include <sys/wait.h>
-
-#include <sched.h>
-#include <fcntl.h>
-#include <sys/mount.h>
-#include <grp.h>
-#include <sys/syscall.h>
-
 #include "common/archive.h"
-
-#include "thirdparty/stb_ds.h"
+#include "common/debug.h"
+#include "common/fs.h"
 
 /******************************************************************************
  *

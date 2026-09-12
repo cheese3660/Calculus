@@ -3,7 +3,7 @@
  *  shell_verb.c
  *  author: Lexi Allen
  *  license: MIT
- *  last updated: 9/11/2026
+ *  last updated: 9/12/2026
  *
  *  shell_verb.c implements the `calculus shell` verb for the calculus package 
  *  manager, which runs a shell with the requested derivative binaries in PATH

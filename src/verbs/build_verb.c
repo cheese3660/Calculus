@@ -14,8 +14,9 @@
  *****************************************************************************/
 
 #include <stdio.h>
-#include <unistd.h>
 #include <stdlib.h>
+
+#include <unistd.h>
 
 static const char* optstring = "";
 
@@ -25,7 +26,7 @@ void usage()
     exit(EXIT_FAILURE);
 }
 
-int build_verb(int argc, const char** argv)
+int build_verb(int argc, char** argv)
 {
     char opt;
     while ((opt = getopt(argc, argv, optstring)) != -1)
@@ -36,4 +37,5 @@ int build_verb(int argc, const char** argv)
     {
         usage();
     }
+    return 0;
 }

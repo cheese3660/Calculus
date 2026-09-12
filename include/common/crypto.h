@@ -10,10 +10,10 @@
  *****************************************************************************/
 
 #pragma once
-#include <stdint.h>
 #include <stddef.h>
-#include <string.h>
+#include <stdint.h>
 #include <stdio.h>
+#include <string.h>
 
 typedef struct {
     // Each of these are stored in little endian to make the computation quick

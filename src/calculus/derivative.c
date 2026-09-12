@@ -3,7 +3,7 @@
  *  derivative.c
  *  author: Lexi Allen
  *  license: MIT
- *  last updated: 9/11/2026
+ *  last updated: 9/12/2026
  *
  *****************************************************************************/
 
@@ -12,13 +12,12 @@
 
 #include <linux/limits.h>
 
+#include "thirdparty/stb_ds.h"
+
 #include "calculus/derivative.h"
 #include "calculus/paths.h"
-
 #include "common/debug.h"
 #include "common/fs.h"
-
-#include "thirdparty/stb_ds.h"
 
 static struct
 {

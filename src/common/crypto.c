@@ -9,10 +9,11 @@
  *
  *****************************************************************************/
 
+#include <math.h>
+#include <string.h>
+
 #include "common/crypto.h"
 #include "common/debug.h"
-#include <string.h>
-#include <math.h>
 
 static sha256_t initial = {
     // (first 32 bits of the fractional parts of the square roots of the first 8 primes 2..19):

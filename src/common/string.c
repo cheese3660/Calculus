@@ -9,13 +9,13 @@
  *
  *****************************************************************************/
 
-#include <stdbit.h>
-#include <string.h>
 #include <errno.h>
 #include <stdarg.h>
+#include <stdbit.h>
+#include <string.h>
 
-#include "common/string.h"
 #include "common/debug.h"
+#include "common/string.h"
 
 // Let's set it up so that we just have a default allocator for now
 // We don't need much more than this
@@ -350,6 +350,7 @@ string_t s_catfa_a(string_t *s, const char *format, ...)
     memcpy(result.cstring, s->cstring, s->length);
     memcpy(result.cstring + s->length, res, len + 1 /* Null byte */);
     result.length = s->length + len;
+    return result;
 }
 
 string_t s_catfn_a(string_t *s, uint32_t max_format, const char *format, ...)

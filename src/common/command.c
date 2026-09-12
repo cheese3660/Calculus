@@ -3,15 +3,16 @@
  *  command.c
  *  author: Lexi Allen
  *  license: MIT
- *  last updated: 9/11/2026
+ *  last updated: 9/12/2026
  *
  *****************************************************************************/
 
-#include <unistd.h>
-#include <sys/wait.h>
-#include <sys/types.h>
 #include <stdio.h>
 #include <stdlib.h>
+
+#include <sys/types.h>
+#include <sys/wait.h>
+#include <unistd.h>
 
 #include "common/command.h"
 int command_run(const char **args)

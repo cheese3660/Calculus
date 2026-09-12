@@ -12,23 +12,24 @@
 
 #define _XOPEN_SOURCE 700
 
+#include <errno.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <errno.h>
-#include <sys/stat.h>
-#include <stdio.h>
-#include <ftw.h>
-#include <sys/types.h>
-#include <dirent.h>
-#include <thirdparty/stb_ds.h>
 
+#include <dirent.h>
+#include <ftw.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+
+#include "thirdparty/stb_ds.h"
+
+#include "calculus/derivative.h"
+#include "calculus/gittools.h"
 #include "calculus/luaenv.h"
 #include "calculus/paths.h"
-#include "calculus/gittools.h"
-#include "calculus/derivative.h"
-
-#include "common/crypto.h"
 #include "common/command.h"
+#include "common/crypto.h"
 #include "common/debug.h"
 #include "common/fs.h"
 #include "common/string.h"
@@ -58,11 +59,10 @@ static char takebuf[PATH_MAX];
 // Modifies the string passed in directly
 static void dir_cleanup(lua_State *L, string_t *path)
 {
-    size_t len = strlen(path);
-    if (len >= PATH_MAX)
+    if (path->length >= PATH_MAX)
         luaL_error(L, "path too long");
 
-    if (len == 1)
+    if (path->length == 1)
     {
         s_setl(path, "/.", strlen("/."));
     }
@@ -102,7 +102,7 @@ static string_t *caller_source(lua_State *L)
         }
         s->length = strlen(result);
 
-        return result;
+        return s;
     }
     LUA_UNREACHABLE;
 }
@@ -159,8 +159,6 @@ static void concat_path(lua_State *L, string_t *path, char *cat)
     }
 
     s_cat(path, cat);
-
-    return path;
 }
 
 // path must always be in a 4kb block, otherwise this is an issue, hence why this is static
@@ -408,7 +406,7 @@ static string_t get_gitpath(lua_State *L, sha256_t *input_sha)
         panic("Git cache path resolves to root");
 
     const char *hex = sha256_to_hex(input_sha);
-    s_catfn(&result, "/%s", hex);
+    s_catfn(&result, 64, "/%s", hex);
 
     return result;
 }
@@ -660,7 +658,7 @@ static int readfile(lua_State *L)
         LUA_PERROR("malloc");
     }
 
-    FILE *f = fopen(path, "r");
+    FILE *f = fopen(path->cstring, "r");
     s_free(path);
     if (f == nullptr)
         LUA_PERROR("fopen");
@@ -705,7 +703,7 @@ static int listdir(lua_State *L)
         luaL_error(L, "listdir(path): path is not a directory");
     }
 
-    DIR *directory = opendir(rel);
+    DIR *directory = opendir(rel->cstring);
     s_free(rel);
     if (directory == nullptr)
         LUA_PERROR("opendir");

@@ -3,7 +3,7 @@
  *  calculus_main.c
  *  author: Lexi Allen
  *  license: MIT
- *  last updated: 9/11/2026
+ *  last updated: 9/12/2026
  *
  *****************************************************************************/
 
@@ -13,17 +13,21 @@
     Separated from some other programs that rely on other entry points (mainly car)
 */
 
-#include <lua.h>
 #include <stdio.h>
-#include "common/crypto.h"
-#include "calculus/luaenv.h"
 #include <stdlib.h>
-#include <unistd.h>
-#include <sys/types.h>
-#include "calculus/derivative.h"
-#include "calculus/build.h"
+
 #include <sys/stat.h>
+#include <sys/types.h>
+#include <unistd.h>
+
+#include <lua.h>
+
 #include "thirdparty/stb_ds.h"
+
+#include "calculus/build.h"
+#include "calculus/derivative.h"
+#include "calculus/luaenv.h"
+#include "common/crypto.h"
 #include "common/debug.h"
 
 #define SHA256(X)                                            \
