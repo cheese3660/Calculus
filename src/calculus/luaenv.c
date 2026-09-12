@@ -139,8 +139,10 @@ static string_t *caller_relative(lua_State *L, const char *relative)
     size_t rel_len = strlen(relative);
 
     if (dir->length + rel_len >= PATH_MAX)
+    {
+        s_free(dir);
         luaL_error(L, "relative path is too long");
-
+    }
     s_cat(dir, relative);
     return dir;
 }
@@ -482,6 +484,7 @@ static string_t local_folder(lua_State *L, const char *folder)
 {
     string_t *rel = caller_relative(L, folder);
     string_t copy = s_copy_a(rel);
+    s_free(rel);
     return copy;
 }
 

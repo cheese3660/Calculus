@@ -33,7 +33,7 @@ static inline size_t get_free_pool_index()
 {
     size_t index = stdc_trailing_zeros(~used_slots);
 
-    if (index > 64)
+    if (index >= 64)
         panic("ran out of string pool slots!");
 
     return index;
@@ -57,7 +57,7 @@ void s_free(string_t *string)
             string->capacity = STRINGPOOL_MAX_HELD_CAPACITY;
         }
 
-        used_slots &= ~(1 << index);
+        used_slots &= ~(UINT64_C(1) << index);
     }
     else
     {

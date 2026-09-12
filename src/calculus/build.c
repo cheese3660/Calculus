@@ -528,13 +528,13 @@ static void mount_dependencies(standard_derivative_t *derivative, string_t *buil
         s_setfn(temp, PATH_MAX, "%s/bin/bash", local->cstring);
         if (fs_exists(temp->cstring))
         {
-            s_setfn(bin_sh, PATH_MAX, "%s/bin/bash", target->cstring);
+            s_setfn(bin_sh, PATH_MAX, "%s/bin/bash", get_derivative_store_path(dependency));
             goto check_env;
         }
 
         s_setfn(temp, PATH_MAX, "%s/bin/sh", local->cstring);
         if (fs_exists(temp->cstring))
-            s_setfn(bin_sh, PATH_MAX, "%s/bin/sh", target->cstring);
+            s_setfn(bin_sh, PATH_MAX, "%s/bin/sh", get_derivative_store_path(dependency));
 
     check_env:
         if (bin_env->length != 0)
@@ -542,7 +542,7 @@ static void mount_dependencies(standard_derivative_t *derivative, string_t *buil
 
         s_setfn(temp, PATH_MAX, "%s/bin/env", local->cstring);
         if (fs_exists(temp->cstring))
-            s_setfn(bin_env, PATH_MAX, "%s/bin/env", target->cstring);
+            s_setfn(bin_env, PATH_MAX, "%s/bin/env", get_derivative_store_path(dependency));
 
     cont:
         if (env_var->length > 0)
