@@ -31,7 +31,7 @@ static uint64_t used_slots;
 
 static inline size_t get_free_pool_index()
 {
-    size_t index = stdc_trailing_zeros(used_slots);
+    size_t index = stdc_trailing_zeros(~used_slots);
 
     if (index > 64)
         panic("ran out of string pool slots!");
@@ -44,7 +44,7 @@ void s_free(string_t *string)
     string->length = 0;
     string->cstring[0] = 0;
 
-    if (string > &pool[0] && string - &pool[0] < 64)
+    if (string >= &pool[0] && string - &pool[0] < 64)
     {
         size_t index = string - &pool[0];
 
@@ -96,12 +96,12 @@ string_t *s_new_p(uint32_t capacity)
     {
         capacity = stdc_bit_ceil(capacity);
         pool[index].capacity = capacity;
-        pool[index].cstring = s_current_alloc->alloc(nullptr, capacity + 1);
+        pool[index].cstring = s_current_alloc->alloc(pool[index].cstring, capacity + 1);
         if (pool[index].cstring == nullptr)
             panic("error allocating string of size %d: %s", capacity, strerror(errno));
     }
     pool[index].cstring[0] = 0;
-    used_slots |= (1 << index);
+    used_slots |= (UINT64_C(1) << index);
     return &pool[index];
 }
 

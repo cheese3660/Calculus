@@ -502,8 +502,9 @@ static void mount_dependencies(standard_derivative_t *derivative, string_t *buil
     // Then we go over every dependency
     for (size_t i = 0; i < derivative->num_dependencies; i++)
     {
-        string_t *local = s_cat_p(filename, get_derivative_node_name(&derivative->dheader));
-        string_t *target = s_own_p(get_derivative_store_path(&derivative->dheader));
+        derivative_header_t* dependency = derivative->dependencies[i];
+        string_t *target = s_cat_p(filename, get_derivative_node_name(dependency));
+        string_t *local = s_fmt_p(PATH_MAX, CALCULUS_STORE_DIRECTORY "/%s", get_derivative_node_name(dependency));
         string_t *temp = s_new_p(PATH_MAX);
 
         // First mounting them
