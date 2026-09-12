@@ -547,7 +547,7 @@ static void mount_dependencies(standard_derivative_t *derivative, string_t *buil
     cont:
         if (env_var->length > 0)
             s_cat(env_var, ":");
-        s_cats(env_var, target);
+        s_cats(env_var, get_derivative_store_path(dependency));
 
         s_free(temp);
         s_free(target);
