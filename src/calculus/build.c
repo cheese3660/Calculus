@@ -10,11 +10,6 @@
  *
  *****************************************************************************/
 
-// This is the main calculus build file
-
-// TODO: Convert this into it's own program - calculus-integrate
-// That when given a derivative recipe in string form, integrates all it's requirements
-
 #define _GNU_SOURCE
 
 #include <errno.h>
