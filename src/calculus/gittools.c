@@ -3,12 +3,14 @@
  *  gittools.c
  *  author: Lexi Allen
  *  license: MIT
- *  last updated: 9/11/2026
+ *  last updated: 9/12/2026
  *
  *****************************************************************************/
 
 #include <git2.h>
 #include <stdio.h>
+
+#include "common/string.h"
 
 static char error_msg[256];
 const char* stored_git_error = "OK";
@@ -19,6 +21,7 @@ int fetch_tag(const char* path, const char* url, const char* tag)
     git_repository* repo = nullptr;
     git_remote* remote = nullptr;
     git_object *fetch_head = nullptr;
+    string_t *refspec = nullptr;
     git_libgit2_init();
 
     // First we need to initialize the repository
@@ -28,9 +31,9 @@ int fetch_tag(const char* path, const char* url, const char* tag)
     if ((result = git_remote_create(&remote, repo, "origin", url)))
         goto cleanup;
 
-    static char refspec[512];
-    snprintf(refspec, sizeof(refspec), "refs/tags/%s:refs/tags/%s", tag, tag);
-    char* specs_list[] = {refspec};
+    refspec = s_fmt_p(512, "refs/tags/%s:refs/tags/%s", tag, tag);
+
+    char* specs_list[] = {refspec->cstring};
 
     git_strarray specs = {};
     specs.strings = specs_list;
@@ -55,6 +58,7 @@ cleanup:
         snprintf(error_msg, sizeof(error_msg), "%s", e ? e->message : "Unknown error");
     }
 
+    if (refspec) s_free(refspec);
     if (fetch_head) git_object_free(fetch_head);
     if (remote) git_remote_free(remote);
     if (repo) git_repository_free(repo);
@@ -69,6 +73,7 @@ int fetch_sha(const char* path, const char* url, const char* sha)
     git_repository* repo = nullptr;
     git_remote* remote = nullptr;
     git_object *fetch_head = nullptr;
+    string_t *refspec = nullptr;
     git_libgit2_init();
 
     // First we need to initialize the repository
@@ -78,8 +83,7 @@ int fetch_sha(const char* path, const char* url, const char* sha)
     if ((result = git_remote_create(&remote, repo, "origin", url)))
         goto cleanup;
 
-    static char refspec[512];
-    snprintf(refspec, sizeof(refspec), "%s:refs/heads/fetch-temp", sha);
+    refspec = s_fmt_p(512, "%s:refs/heads/fetch-temp", sha);
     char* specs_list[] = {refspec};
 
     git_strarray specs = {};
@@ -105,6 +109,7 @@ cleanup:
         snprintf(error_msg, sizeof(error_msg), "%s", e ? e->message : "Unknown error");
     }
 
+    if (refspec) s_free(refspec);
     if (fetch_head) git_object_free(fetch_head);
     if (remote) git_remote_free(remote);
     if (repo) git_repository_free(repo);
