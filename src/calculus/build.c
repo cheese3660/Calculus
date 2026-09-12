@@ -386,9 +386,20 @@ done:
  * STANDARD BUILD HANDLER
  *
  * setup_uid_map() - Handles setting up the UID map in an unshare environment
- * enter_unshare() - Enters the unshare environment of the build process, after
- *                   stdin and stdout are set up
- *
+ * checked_mount() - Runs mount() and if it fails prints a message and exits
+ * checked_mkdir() - Runs mkdir() and if it fails prints a message and exits
+ * mkd_mount() - checked_mkdir() on mount target then checked_mount()
+ * checked_touch() - Touches a file and if it fails prints a message and exits
+ * mkf_mount() - checked_touch() on mount target then checked_mount()
+ * mount_dependencies() - Mount all the dependencies of a derivative and
+ *                        collect them in an environment variable alongside
+ *                        the eventual sh & env symlinks
+ * enter_jail() - Enters the unshare environment of the build process, after
+ *                stdin and stdout are set up
+ * copy_file() - Copy one file stream to another
+ * monitor_jail() - Monitors the jail process and prints diagnostics
+ * build_standard() - Build a standard derivative using a sandboxed jail
+ * 
  *****************************************************************************/
 
 static void setup_uid_map(uid_t uid, gid_t gid)
