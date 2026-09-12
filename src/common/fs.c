@@ -3,7 +3,9 @@
  *  fs.c
  *  author: Lexi Allen
  *  license: MIT
- *  last updated: 9/11/2026
+ *  last updated: 9/12/2026
+ * 
+ *  Some very basic filesystem abstractions
  *
  *****************************************************************************/
 
@@ -48,7 +50,6 @@ bool fs_isreg(const char* path)
 int fs_ensure_dir(const char* path)
 {
     if (!fs_isdir(path)) {
-        // Some day we will not do this
         const char* command[] = {"mkdir", "-p", path, nullptr};
         return command_run(command);
     }

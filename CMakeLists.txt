@@ -20,6 +20,7 @@ add_executable(calculus
     src/common/archive.c # Used for moving stuff between stores/caches
     src/common/command.c
     src/common/fs.c
+    src/common/string.c
 
     src/calculus/luaenv.c
     src/calculus/gittools.c

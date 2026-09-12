@@ -3,8 +3,10 @@
  *  crypto.h
  *  author: Lexi Allen
  *  license: MIT
- *  last updated: 9/11/2026
+ *  last updated: 9/12/2026
  *
+ *  Hand rolled implementation of SHA256 hashing
+ * 
  *****************************************************************************/
 
 #pragma once

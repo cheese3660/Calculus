@@ -3,8 +3,10 @@
  *  fs.h
  *  author: Lexi Allen
  *  license: MIT
- *  last updated: 9/11/2026
+ *  last updated: 9/12/2026
  *
+ *  Some very basic filesystem abstractions
+ * 
  *****************************************************************************/
 
 #pragma once
