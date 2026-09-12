@@ -3,7 +3,10 @@
  *  build.c
  *  author: Lexi Allen
  *  license: MIT
- *  last updated: 9/11/2026
+ *  last updated: 9/12/2026
+ * 
+ *  This file contains the implementation of the sandboxed builder system that
+ *  is what takes a derivative recipe and creates its artifact in the store.
  *
  *****************************************************************************/
 
@@ -41,9 +44,22 @@
 #include <grp.h>
 #include <sys/syscall.h>
 
-#include <common/archive.h>
+#include "common/archive.h"
 
 #include "thirdparty/stb_ds.h"
+
+/******************************************************************************
+ *
+ * GENERAL BUILDING UTILITIES
+ *
+ * ensure_paths() - Ensure that all the necessary directories for building are
+ *                  created
+ * copy_archive() - Copy the data from one archive to another
+ * extract_archive() - Extract an archive to a given directory, ensuring that
+ *                     the archive is extracted readonly
+ * copy_directory() - Copy 2 directories between eachother using libarchive
+ * 
+ *****************************************************************************/
 
 static void ensure_paths()
 {
@@ -148,7 +164,7 @@ static int extract_archive(const char *file, const char *directory)
     return result;
 }
 
-static int copy_directory_readonly(const char *from_directory, const char *directory)
+static int copy_directory(const char *from_directory, const char *directory)
 {
     int result;
 
@@ -942,7 +958,7 @@ static int build_standard(standard_derivative_t *standard)
                     goto true_finalize;
                 }
 
-                if (copy_directory_readonly(out_path, store_path_buffer) != ARCHIVE_OK)
+                if (copy_directory(out_path, store_path_buffer) != ARCHIVE_OK)
                 {
                     code = EXIT_FAILURE;
                     goto true_finalize;
