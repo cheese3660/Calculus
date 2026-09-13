@@ -57,10 +57,10 @@ static char takebuf[PATH_MAX];
  *****************************************************************************/
 
 // Modifies the string passed in directly
-static void dir_cleanup(lua_State *L, string_t *path)
+static bool dir_cleanup(string_t *path)
 {
     if (path->length >= PATH_MAX)
-        luaL_error(L, "path too long");
+        return false;
 
     if (path->length == 1)
     {
@@ -70,6 +70,7 @@ static void dir_cleanup(lua_State *L, string_t *path)
     {
         s_trimr(path, "/");
     }
+    return true;
 }
 
 // Returns a string from the string pool, duplicate it if it needs to be kept
@@ -117,7 +118,11 @@ static string_t *caller_directory(lua_State *L)
             break;
         }
     }
-    dir_cleanup(L, path);
+    if (!dir_cleanup(path))
+    {
+        s_free(path);
+        luaL_error(L, "path too long");
+    }
     return path;
 }
 
@@ -127,7 +132,11 @@ static string_t *caller_relative(lua_State *L, const char *relative)
     if (relative[0] == '/')
     {
         string_t *res = s_own_p(relative);
-        dir_cleanup(L, res);
+        if (!dir_cleanup(res))
+        {
+            s_free(res);
+            luaL_error(L, "path too long");
+        }
         return res;
     }
 
@@ -141,11 +150,11 @@ static string_t *caller_relative(lua_State *L, const char *relative)
     return dir;
 }
 
-static void concat_path(lua_State *L, string_t *path, char *cat)
+static bool concat_path(string_t *path, char *cat)
 {
     // Just confirm that we can actually do this
     if (path->length + strlen(cat) + 1 >= PATH_MAX)
-        luaL_error(L, "module path is too long");
+        return false;
 
     // Idk how this happens but easy to work around
     if (!s_endswith(path, "/"))
@@ -154,12 +163,13 @@ static void concat_path(lua_State *L, string_t *path, char *cat)
     }
 
     s_cat(path, cat);
+    return true;
 }
 
 // path must always be in a 4kb block, otherwise this is an issue, hence why this is static
-static void get_module_path(lua_State *L, string_t *path)
+static bool get_module_path(string_t *path)
 {
-    concat_path(L, path, "module.lua");
+    return concat_path(path, "module.lua");
 }
 
 /******************************************************************************
@@ -203,7 +213,11 @@ static int import(lua_State *L)
     if (S_ISDIR(mode))
     {
         // path = get_module_path(L, path);
-        get_module_path(L, &path);
+        if (!get_module_path(&path))
+        {
+            s_free(&path);
+            luaL_error(L, "module path is too long");
+        }
         if (stat(path.cstring, &stat_buf) == -1)
         {
             // Free is guaranteed to preserve errno and s_free should go to free, see man 3 free:
@@ -299,14 +313,14 @@ static struct
 
 static char **teardown_stack;
 
-static void get_pre_path(lua_State *L, string_t *path)
+static bool get_pre_path(string_t *path)
 {
-    concat_path(L, path, "_pre.lua");
+    return concat_path(path, "_pre.lua");
 }
 
-static void get_post_path(lua_State *L, string_t *path)
+static bool get_post_path(string_t *path)
 {
-    concat_path(L, path, "_post.lua");
+    return concat_path(path, "_post.lua");
 }
 
 /* This is the common library load path */
@@ -324,23 +338,31 @@ static void load_library(lua_State *L, string_t path)
     shput(library_set, path.cstring, 0);
 
     string_t *pre = s_copy_p(&path);
-    get_pre_path(L, pre);
+    if (!get_pre_path(pre))
+    {
+        s_free(pre);
+        s_free(&path);
+        luaL_error(L, "library _pre.lua path is too long");
+    }
 
     struct stat stat_buf;
     if (stat(pre->cstring, &stat_buf) == -1)
     {
+        s_free(pre);
         s_free(&path);
         LUA_PERROR("stat");
     }
 
     if (!S_ISREG(stat_buf.st_mode))
     {
+        s_free(pre);
         s_free(&path);
         luaL_error(L, "library _pre.lua is not a file!");
     }
 
     if (luaL_loadfile(L, pre->cstring) != LUA_OK)
     {
+        s_free(pre);
         s_free(&path);
         luaL_error(L, "Failed to load library _pre.lua:\n\t%s", lua_tostring(L, -1));
     }
@@ -358,7 +380,11 @@ static void load_library(lua_State *L, string_t path)
     }
 
     // Post is now in the original path path
-    get_post_path(L, &path);
+    if (!get_post_path(&path))
+    {
+        s_free(&path);
+        luaL_error(L, "library _post.lua path is too long");
+    }
     if (stat(path.cstring, &stat_buf) == -1)
     {
         s_free(&path);
