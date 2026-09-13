@@ -3,7 +3,7 @@
  *  build.c
  *  author: Lexi Allen
  *  license: MIT
- *  last updated: 9/12/2026
+ *  last updated: 9/13/2026
  *
  *  This file contains the implementation of the sandboxed builder system that
  *  is what takes a derivative recipe and creates its artifact in the store.
@@ -547,7 +547,7 @@ static void mount_dependencies(standard_derivative_t *derivative, string_t *buil
     cont:
         if (env_var->length > 0)
             s_cat(env_var, ":");
-        s_cats(env_var, get_derivative_store_path(dependency));
+        s_cat(env_var, get_derivative_store_path(dependency));
 
         s_free(temp);
         s_free(target);

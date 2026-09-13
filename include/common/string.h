@@ -3,7 +3,7 @@
  *  string.h
  *  author: Lexi Allen
  *  license: MIT
- *  last updated: 9/12/2026
+ *  last updated: 9/13/2026
  *
  *  A very basic dynamic string library
  *
@@ -56,6 +56,15 @@ static inline void s_clear(string_t *string)
 /// @brief Free a string, releasing it's memory if it has an allocator
 /// @param string The string to free
 void s_free(string_t *string);
+
+/// @brief Mark this state of the string pool
+/// @return A unique identifier for this state of the stringpool
+/// @warning Do not release strings that were not allocated during a mark/unmark pair
+uint64_t s_pool_mark();
+
+/// @brief Restore a marked state of the string pool
+/// @param mark The unique identifier for the state of the stringpool
+void s_pool_unmark(uint64_t mark);
 
 /// @brief Allocate a new string with a given capacity
 /// @param capacity The initial capacity, use STRING_DEFAULT_CAPACITY if you don't know what to use

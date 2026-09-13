@@ -3,7 +3,7 @@
  *  string.c
  *  author: Lexi Allen
  *  license: MIT
- *  last updated: 9/12/2026
+ *  last updated: 9/13/2026
  *
  *  Implementation of a basic dynamic string library with a string pool
  *
@@ -65,6 +65,29 @@ void s_free(string_t *string)
             string->allocator->dealloc(string->cstring);
     }
 }
+
+uint64_t s_pool_mark()
+{
+    return used_slots;
+}
+
+void s_pool_unmark(uint64_t mark)
+{
+    if ((mark & used_slots) != mark)
+        panic("strings were released from the stringpool from outside the mark()/unmark() guards!");
+    uint64_t needs_free = used_slots & ~mark;
+
+    while (needs_free)
+    {
+        size_t index = stdc_trailing_zeros(needs_free);
+        s_free(&pool[index]);
+        // Clear the lowest bit set
+        needs_free &= needs_free-1;
+    }
+
+    used_slots = mark;
+}
+
 
 string_t s_new_a(uint32_t capacity)
 {

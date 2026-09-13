@@ -3,7 +3,7 @@
  *  luaenv.c
  *  author: Lexi Allen
  *  license: MIT
- *  last updated: 9/12/2026
+ *  last updated: 9/13/2026
  *
  *  This contains the implementation of the calculus lua environment, all the
  *  functions that it uses, and how it resolves paths
@@ -96,10 +96,7 @@ static string_t *caller_source(lua_State *L)
         string_t *s = s_new_p(PATH_MAX);
         char *result = realpath(caller_path, s->cstring);
         if (result == nullptr)
-        {
-            s_free(s);
             LUA_PERROR("realpath");
-        }
         s->length = strlen(result);
 
         return s;
@@ -139,10 +136,7 @@ static string_t *caller_relative(lua_State *L, const char *relative)
     size_t rel_len = strlen(relative);
 
     if (dir->length + rel_len >= PATH_MAX)
-    {
-        s_free(dir);
         luaL_error(L, "relative path is too long");
-    }
     s_cat(dir, relative);
     return dir;
 }
@@ -151,9 +145,8 @@ static void concat_path(lua_State *L, string_t *path, char *cat)
 {
     // Just confirm that we can actually do this
     if (path->length + strlen(cat) + 1 >= PATH_MAX)
-    {
         luaL_error(L, "module path is too long");
-    }
+
     // Idk how this happens but easy to work around
     if (!s_endswith(path, "/"))
     {
@@ -248,7 +241,11 @@ static int import(lua_State *L)
 
         // stack [..., block]
         int before_top = lua_gettop(L) - 1;
-        if (lua_pcall(L, 0, LUA_MULTRET, 0) != LUA_OK)
+
+        uint64_t mark = s_pool_mark();
+        int pcall_result = lua_pcall(L, 0, LUA_MULTRET, 0);
+        s_pool_unmark(mark);
+        if (pcall_result != LUA_OK)
         {
             luaL_error(L, "Runtime error in running script %s:\t%s", s_taken(&path, takebuf, PATH_MAX), lua_tostring(L, -1));
         }
@@ -332,29 +329,33 @@ static void load_library(lua_State *L, string_t path)
     struct stat stat_buf;
     if (stat(pre->cstring, &stat_buf) == -1)
     {
-        s_free(pre);
         s_free(&path);
         LUA_PERROR("stat");
     }
 
     if (!S_ISREG(stat_buf.st_mode))
     {
-        s_free(pre);
         s_free(&path);
         luaL_error(L, "library _pre.lua is not a file!");
     }
 
     if (luaL_loadfile(L, pre->cstring) != LUA_OK)
     {
-        s_free(pre);
         s_free(&path);
         luaL_error(L, "Failed to load library _pre.lua:\n\t%s", lua_tostring(L, -1));
     }
 
     s_free(pre);
 
-    if (lua_pcall(L, 0, LUA_MULTRET, 0) != LUA_OK)
+    uint64_t mark = s_pool_mark();
+    int pcall_res = lua_pcall(L, 0, LUA_MULTRET, 0);
+    s_pool_unmark(mark);
+
+    if (pcall_res != LUA_OK)
+    {
+        s_free(&path);
         luaL_error(L, "Error running library _pre.lua:\n\t%s", lua_tostring(L, -1));
+    }
 
     // Post is now in the original path path
     get_post_path(L, &path);
@@ -644,22 +645,14 @@ static int readfile(lua_State *L)
 
     struct stat stat_buf;
     if (stat(path->cstring, &stat_buf) == -1)
-    {
-        s_free(path);
         LUA_PERROR("stat");
-    }
-        
+
     if (!S_ISREG(stat_buf.st_mode))
-    {
-        s_free(path);
         luaL_error(L, "readfile(path): path must point to a regular file");
-    }
 
     char *buffer = malloc(stat_buf.st_size);
-    if (buffer == nullptr) {
-        s_free(path);
+    if (buffer == nullptr)
         LUA_PERROR("malloc");
-    }
 
     FILE *f = fopen(path->cstring, "r");
     s_free(path);
@@ -695,16 +688,10 @@ static int listdir(lua_State *L)
 
     struct stat buf;
     if (stat(rel->cstring, &buf) == -1)
-    {
-        s_free(rel);
         LUA_PERROR("stat");
-    }
 
     if (!S_ISDIR(buf.st_mode))
-    {
-        s_free(rel);
         luaL_error(L, "listdir(path): path is not a directory");
-    }
 
     DIR *directory = opendir(rel->cstring);
     s_free(rel);
@@ -986,7 +973,12 @@ int env_run(const char *path)
     // We don't want any prior teardown state coming here, if this somehow leaks there is a bigger issue
     (void)arrfree(teardown_stack);
     int result = 0;
-    if (luaL_dofile(state, path) != LUA_OK)
+
+    uint64_t mark = s_pool_mark();
+    int dofile_result = luaL_dofile(state, path);
+    s_pool_unmark(mark);
+
+    if (dofile_result != LUA_OK)
     {
         const char *error = lua_tostring(state, -1);
         fprintf(stderr, "running %s failed with error: %s\n", path, error);
@@ -1000,7 +992,10 @@ int env_run(const char *path)
         // Pop it
         arrdel(teardown_stack, arrlen(teardown_stack) - 1);
         // Then run the teardown script
-        if (luaL_dofile(state, top) != LUA_OK)
+        int dofile_result = luaL_dofile(state, top);
+        // None of the previous methods touch the string pool whatsoever so we can just do
+        s_pool_unmark(mark);
+        if (dofile_result != LUA_OK)
         {
             const char *error = lua_tostring(state, -1);
             fprintf(stderr, "running %s failed with error: %s\n", top, error);
