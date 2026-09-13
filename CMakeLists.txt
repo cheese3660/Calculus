@@ -30,7 +30,8 @@ add_executable(calculus
     src/thirdparty/stb_ds.c
 
     # These are all the command verbs
-    src/verbs/build_verb.c # This is what builds
+    src/verbs/build_verb.c
+    include/common/utility.h # This is what builds
 )
 
 target_include_directories(calculus PRIVATE include)

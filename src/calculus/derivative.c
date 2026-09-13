@@ -3,10 +3,11 @@
  *  derivative.c
  *  author: Lexi Allen
  *  license: MIT
- *  last updated: 9/12/2026
+ *  last updated: 9/13/2026
  *
  *****************************************************************************/
 
+#include <errno.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -18,6 +19,7 @@
 #include "calculus/paths.h"
 #include "common/debug.h"
 #include "common/fs.h"
+#include "common/string.h"
 
 static struct
 {
@@ -27,27 +29,35 @@ static struct
 
 static derivative_header_t **requested_derivatives = nullptr;
 
+string_t *get_standard_derivative_recipe(
+    size_t num_dependencies,
+    derivative_header_t **dependencies,
+    const char *name,
+    const char *build)
+{
+    string_t *tmp = s_new_p(STRING_DEFAULT_CAPACITY);
+    s_cat(tmp, "---- recipe for ");
+    s_cat(tmp, name);
+    s_cat(tmp, " ----\ningredients:");
+    for (size_t i = 0; i < num_dependencies; i++)
+    {
+        s_cat(tmp, "\n- ");
+        s_cat(tmp, get_derivative_node_name(dependencies[i]));
+    }
+    s_cat(tmp, "\ninstructions:\n");
+    s_cat(tmp, build);
+    return tmp;
+}
+
 standard_derivative_t *create_standard_derivative(
     size_t num_dependencies,
     derivative_header_t **dependencies,
     const char *name,
     const char *build)
 {
-    // Let's create the hash first
-    // This will be the exact hash of the resulting .drv file if we make those
-    sha256_ingest_t drv_ingest = {};
-    sha256_appends(&drv_ingest, "---- recipe for ");
-    sha256_appends(&drv_ingest, name);
-    sha256_appends(&drv_ingest, " ----\ningredients:");
-    for (size_t i = 0; i < num_dependencies; i++)
-    {
-        sha256_appends(&drv_ingest, "\n- ");
-        sha256_appends(&drv_ingest, get_derivative_node_name(dependencies[i]));
-    }
-    sha256_appends(&drv_ingest, "\ninstructions:\n");
-    sha256_appends(&drv_ingest, build);
-
-    sha256_t hash = sha256_finalize(&drv_ingest);
+    string_t *recipe = get_standard_derivative_recipe(num_dependencies, dependencies, name, build);
+    sha256_t hash = sha256_hash(recipe->cstring, recipe->length);
+    s_free(recipe);
 
     derivative_header_t *preexisting = hmget(registered_derivatives, hash);
     if (preexisting != nullptr)
@@ -88,7 +98,6 @@ fetch_tarball_derivative_t *create_fetch_tarball_derivative(
         if (((fetch_tarball_derivative_t *)preexisting)->extract != extract)
             return nullptr; // TODO: add error message here
 
-        
         return (fetch_tarball_derivative_t *)preexisting;
     }
 
@@ -164,31 +173,6 @@ const char *get_derivative_store_path(derivative_header_t *derivative)
     return path_buf;
 }
 
-// static derivative_header_t **push(derivative_header_t **stack, derivative_header_t *wanted)
-// {
-//     for (ssize_t i = 0; i < arrlen(stack); i++)
-//     {
-//         if (stack[i] == wanted)
-//             return stack;
-//     }
-
-//     static char buffer[PATH_MAX];
-
-//     debug("pushing - %s", get_derivative_node_name(wanted));
-//     arrpush(stack, wanted);
-
-//     if (wanted->dtype == DT_STANDARD)
-//     {
-//         standard_derivative_t *actual = (standard_derivative_t *)wanted;
-//         for (size_t i = 0; i < actual->num_dependencies; i++)
-//         {
-//             stack = push(stack, actual->dependencies[i]);
-//         }
-//     }
-
-//     return stack;
-// }
-
 // Postorder dependency sort
 // Instead of the accidental preorder one I had before
 void resolve_dependencies(
@@ -258,3 +242,77 @@ void buildstack_free(derivative_header_t **stack)
 {
     arrfree(stack);
 }
+
+int derivative_write_recipe(derivative_header_t *recipe, FILE *file)
+{
+    int check = 0;
+    switch (recipe->dtype)
+    {
+    case DT_STANDARD:
+        standard_derivative_t* std = (standard_derivative_t*)recipe;
+        string_t *tmp = get_standard_derivative_recipe(std->num_dependencies, std->dependencies, std->name, std->build);
+        check = fwrite(tmp->cstring,1,tmp->length,file);
+        s_free(tmp);
+        if (check < 0)
+        {
+            fprintf(stderr, "failed to write recipe for derivativee: %s", strerror(errno));
+            return -1;
+        }
+        break;
+    case DT_FETCH_TARBALL:
+        check = fprintf(file, "fetch: %s\n", ((fetch_tarball_derivative_t *)recipe)->url);
+        if (check < 0)
+        {
+            fprintf(stderr, "failed to write recipe for derivativee: %s", strerror(errno));
+            return -1;
+        }
+        check = fprintf(file, "hash: %s\n", sha256_to_hex(&recipe->dhash));
+        if (check < 0)
+        {
+            fprintf(stderr, "failed to write recipe for derivative: %s", strerror(errno));
+            return -1;
+        }
+        if (((fetch_tarball_derivative_t *)recipe)->extract)
+        {
+            check = fprintf(file, "extract: yes");
+            if (check < 0)
+            {
+                fprintf(stderr, "failed to write recipe for derivative: %s", strerror(errno));
+                return -1;
+            }
+        }
+        else
+        {
+            check = fprintf(file, "extract: no");
+            if (check < 0)
+            {
+                fprintf(stderr, "failed to write recipe for derivate: %s", strerror(errno));
+                return -1;
+            }
+        }
+        break;
+    default:
+        panic("Unknown derivative type: %d", recipe->dtype);
+    }
+    return 0;
+}
+
+// derivative_header_t *derivative_read_recipe(FILE *file)
+// {
+//     // We should be able to convert a file into a string
+//     size_t buffer_size = 0;
+//     derivative_header_t* result = nullptr;
+//     char* buffer = nullptr;
+//     ssize_t read;
+//     read = getline(&buffer, &buffer_size, file);
+//     if (read < 0)
+
+//     s_viewl(buffer, line_length)
+
+// cleanup:
+//     if (buffer) free(buffer);
+//     return result;
+// }
+
+
+int dump_cookbook();

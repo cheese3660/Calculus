@@ -146,6 +146,7 @@ static string_t *caller_relative(lua_State *L, const char *relative)
 
     if (dir->length + rel_len >= PATH_MAX)
         luaL_error(L, "relative path is too long");
+    s_cat(dir, "/");
     s_cat(dir, relative);
     return dir;
 }

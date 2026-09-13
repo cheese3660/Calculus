@@ -3,7 +3,7 @@
  *  derivative.h
  *  author: Lexi Allen
  *  license: MIT
- *  last updated: 9/12/2026
+ *  last updated: 9/13/2026
  *
  *****************************************************************************/
 
@@ -118,3 +118,18 @@ derivative_header_t *buildstack_next(derivative_header_t **stack);
 /// @brief Free a build stack
 /// @param stack The build stack to free
 void buildstack_free(derivative_header_t** stack);
+
+/// @brief Write a derivative's recipe to a given file
+/// @param recipe The derivative to write to the file
+/// @param file The file to write to
+/// @return 0 on success, negative on failure
+int derivative_write_recipe(derivative_header_t* recipe, FILE* file);
+
+/// @brief Read a derivative from a given file
+/// @param file The file
+/// @return The newly allocated or interned derivative read from the file, nullptr if it fails
+derivative_header_t *derivative_read_recipe(FILE *file);
+
+/// @brief Dump the entire cookbook to the recipes folder
+/// @return 0 on success, negative on failure
+int dump_cookbook();
