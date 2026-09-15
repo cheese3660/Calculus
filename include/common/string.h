@@ -3,7 +3,7 @@
  *  string.h
  *  author: Lexi Allen
  *  license: MIT
- *  last updated: 9/14/2026
+ *  last updated: 9/15/2026
  *
  *  A very basic dynamic string library
  *
@@ -22,8 +22,10 @@
 // and releasing them
 struct string_allocator
 {
-    void *(*alloc)(void *old, size_t new_size);
-    void (*dealloc)(void *ptr);
+    // realloc() semantics
+    void *(*alloc)(void *old, size_t new_size) __attribute__((alloc_size(2), access(read_write, 1), warn_unused_result));
+    // free() semantics
+    void (*dealloc)(void *ptr) __attribute__((access(read_write, 1)));
 };
 
 extern struct string_allocator *s_current_alloc;
