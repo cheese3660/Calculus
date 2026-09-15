@@ -236,6 +236,7 @@ stream_t sm_memwrite(void **buffer, size_t *buffer_size)
  *
  *****************************************************************************/
 
+
 /// @brief Read from a stream
 /// @param stream The stream to read from
 /// @param buffer The buffer to read into
