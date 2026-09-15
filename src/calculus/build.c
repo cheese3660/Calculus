@@ -3,7 +3,7 @@
  *  build.c
  *  author: Lexi Allen
  *  license: MIT
- *  last updated: 9/13/2026
+ *  last updated: 9/15/2026
  *
  *  This file contains the implementation of the sandboxed builder system that
  *  is what takes a derivative recipe and creates its artifact in the store.
@@ -239,14 +239,14 @@ static int copy_directory(const char *from_directory, const char *directory)
 
 /******************************************************************************
  *
- * TARBALL HANDLER
+ * FETCH HANDLER
  *
- * build_tarball() - fetches a tarball from the url, verifies it's hash, and
- *                   optionally extracts it
+ * fetch() - fetches a file from the url, verifies its hash, and
+ *           optionally extracts it
  *
  *****************************************************************************/
 
-static int build_tarball(fetch_tarball_derivative_t *tarball)
+static int fetch(fetch_derivative_t* spec)
 {
     // static char fp_buffer[512 /* We can assume a lot less of a size here because there is a max size on paths*/];
     string_t *filepath = nullptr;
@@ -264,33 +264,33 @@ static int build_tarball(fetch_tarball_derivative_t *tarball)
     }
 
     // snprintf(fp_buffer, 512, "%s/%s", CALCULUS_STORE_DIRECTORY, get_derivative_node_name((derivative_header_t *)tarball));
-    filepath = s_fmt_p(512, CALCULUS_STORE_DIRECTORY "/%s", get_derivative_node_name((derivative_header_t *)tarball));
+    filepath = s_fmt_p(512, CALCULUS_STORE_DIRECTORY "/%s", get_derivative_node_name((derivative_header_t *)spec));
 
-    if (!tarball->extract)
+    if (!spec->extract)
     {
         outfile_name = filepath->cstring;
     }
     else
     {
-        outfile_name = "/tmp/downloaded_tarball";
+        outfile_name = "/tmp/fetched_file";
     }
 
     fp = fopen(outfile_name, "w");
 
     if (!fp)
     {
-        fprintf(stderr, "error opening file to download tarball %s to: %s\n", tarball->url, strerror(errno));
+        fprintf(stderr, "error opening file to download %s to: %s\n", spec->url, strerror(errno));
         goto done;
     }
 
-    curl_easy_setopt(curl, CURLOPT_URL, tarball->url);
+    curl_easy_setopt(curl, CURLOPT_URL, spec->url);
     curl_easy_setopt(curl, CURLOPT_WRITEDATA, fp);
     curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
 
     CURLcode error = curl_easy_perform(curl);
     if (error != CURLE_OK)
     {
-        fprintf(stderr, "error downloading tarball %s via curl: %s\n", tarball->url, curl_easy_strerror(error));
+        fprintf(stderr, "error downloading file %s via curl: %s\n", spec->url, curl_easy_strerror(error));
         goto done;
     }
 
@@ -298,7 +298,7 @@ static int build_tarball(fetch_tarball_derivative_t *tarball)
     curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &http_code);
     if (http_code >= 400)
     {
-        fprintf(stderr, "downloading tarball %s failed with code %ld\n", tarball->url, http_code);
+        fprintf(stderr, "downloading file %s failed with code %ld\n", spec->url, http_code);
         remove(outfile_name);
         goto done;
     }
@@ -307,7 +307,7 @@ static int build_tarball(fetch_tarball_derivative_t *tarball)
     fp = fopen(outfile_name, "r");
     if (!fp)
     {
-        fprintf(stderr, "error opening tarball %s after downloading: %s\n", tarball->url, strerror(errno));
+        fprintf(stderr, "error opening file %s after downloading: %s\n", spec->url, strerror(errno));
         goto done;
     }
 
@@ -315,23 +315,23 @@ static int build_tarball(fetch_tarball_derivative_t *tarball)
     fclose(fp);
     fp = nullptr;
 
-    if (sha256_cmp(&file_hash, &tarball->dheader.dhash) != 0)
+    if (sha256_cmp(&file_hash, &spec->filehash) != 0)
     {
-        fprintf(stderr, "tarball %s hash is not what was expected!\n", tarball->url);
-        fprintf(stderr, "expected: %s\n", sha256_to_hex(&tarball->dheader.dhash));
+        fprintf(stderr, "file %s hash is not what was expected!\n", spec->url);
+        fprintf(stderr, "expected: %s\n", sha256_to_hex(&spec->filehash));
         fprintf(stderr, "got: %s\n", sha256_to_hex(&file_hash));
         remove(outfile_name);
         goto done;
     }
 
-    if (!tarball->extract)
+    if (!spec->extract)
     {
         // Mark as read only
         chmod(outfile_name, 0444);
         // And owned by root
         if (chown(outfile_name, 0, 0) == -1)
         {
-            fprintf(stderr, "error changing owner of tarball %s file: %s\n", tarball->url, strerror(errno));
+            fprintf(stderr, "error changing owner of %s: %s\n", spec->url, strerror(errno));
             remove(outfile_name);
             goto done;
         }
@@ -342,14 +342,14 @@ static int build_tarball(fetch_tarball_derivative_t *tarball)
     // Now let's make our directory
     if (mkdir(filepath->cstring, 0777) == -1)
     {
-        fprintf(stderr, "error creating output directory for built tarball %s: %s\n", tarball->url, strerror(errno));
+        fprintf(stderr, "error creating output directory for fetched file %s: %s\n", spec->url, strerror(errno));
         remove(outfile_name);
         goto extract_done;
     }
 
     if (extract_archive(outfile_name, filepath->cstring) != ARCHIVE_OK)
     {
-        fprintf(stderr, "error extracting tarball %s\n", tarball->url);
+        fprintf(stderr, "error extracting tarball %s\n", spec->url);
         remove(outfile_name);
         goto extract_done;
     }
@@ -982,8 +982,8 @@ int build_derivative(derivative_header_t *to_build)
     {
     case DT_STANDARD:
         return build_standard((standard_derivative_t *)to_build);
-    case DT_FETCH_TARBALL:
-        return build_tarball((fetch_tarball_derivative_t *)to_build);
+    case DT_FETCH:
+        return fetch((fetch_derivative_t *)to_build);
     default:
         fprintf(stderr, "unknown derivative type!");
         return -1;

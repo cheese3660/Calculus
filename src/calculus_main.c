@@ -3,7 +3,7 @@
  *  calculus_main.c
  *  author: Lexi Allen
  *  license: MIT
- *  last updated: 9/12/2026
+ *  last updated: 9/15/2026
  *
  *****************************************************************************/
 
@@ -108,9 +108,9 @@ void mermaid_step1(FILE* output, derivative_header_t* node)
             mermaid_step1(output, n->dependencies[i]);
         }
     }
-    else if (node->dtype == DT_FETCH_TARBALL)
+    else if (node->dtype == DT_FETCH)
     {
-        fetch_tarball_derivative_t* n = (fetch_tarball_derivative_t*)node;
+        fetch_derivative_t *n = (fetch_derivative_t*)node;
         fprintf(output, "    node_%s[\"%s\"]\n", sha256_to_hex(&node->dhash), n->url);
     }
     else
@@ -139,7 +139,7 @@ void mermaid_step2(FILE* output, derivative_header_t* node)
         }
         free(hash);
     }
-    else if (node->dtype == DT_FETCH_TARBALL)
+    else if (node->dtype == DT_FETCH)
     {
         // Nothing to do here
     }

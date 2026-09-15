@@ -18,6 +18,7 @@
 
 #include <sys/types.h>
 
+
 struct stream_header;
 
 struct stream_info
@@ -153,4 +154,3 @@ enum stream_status sm_r32(stream_t stream, uint32_t *u32, bool* truncated) __att
 /// @param truncated An out parameter for whether or not the read was truncated, can be nullptr
 /// @return The new status of the stream after the call
 enum stream_status sm_r64(stream_t stream, uint64_t *u64, bool* truncated) __attribute__((access(read_write, 1), access(write_only, 2), access(write_only, 3), nonnull(1, 2)));
-

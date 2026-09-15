@@ -3,7 +3,7 @@
  *  string.c
  *  author: Lexi Allen
  *  license: MIT
- *  last updated: 9/13/2026
+ *  last updated: 9/15/2026
  *
  *  Implementation of a basic dynamic string library with a string pool
  *
@@ -92,9 +92,8 @@ void s_pool_unmark(uint64_t mark)
 
 string_t s_new_a(uint32_t capacity)
 {
-    // Always convert the capacity to the next power of 2
-    capacity = stdc_bit_ceil(capacity);
-
+    // We don't convert capacity to the next power of 2 anymore just so that statically sized strings
+    // Don't keep taking a whole lot more memory
     string_t result;
     result.allocator = s_current_alloc;
     result.length = 0;
@@ -118,7 +117,8 @@ string_t *s_new_p(uint32_t capacity)
 
     if (pool[index].capacity < capacity)
     {
-        capacity = stdc_bit_ceil(capacity);
+        // We don't convert capacity to the next power of 2 anymore just so that statically sized strings
+        // Don't keep taking a whole lot more memory
         pool[index].capacity = capacity;
         pool[index].cstring = s_current_alloc->alloc(pool[index].cstring, capacity + 1);
         if (pool[index].cstring == nullptr)

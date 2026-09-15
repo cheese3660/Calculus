@@ -15,23 +15,23 @@ pkg_check_modules(LIBCURL REQUIRED IMPORTED_TARGET libcurl)
 
 add_executable(calculus 
     src/calculus_main.c
-    
-    src/common/crypto.c
-    src/common/archive.c # Used for moving stuff between stores/caches
+
+    src/common/archive.c
     src/common/command.c
+    src/common/crypto.c
     src/common/fs.c
+    src/common/stream.c
+    src/common/stream_aux.c
     src/common/string.c
 
-    src/calculus/luaenv.c
-    src/calculus/gittools.c
-    src/calculus/derivative.c
     src/calculus/build.c
+    src/calculus/derivative.c
+    src/calculus/gittools.c
+    src/calculus/luaenv.c
+
+    src/verbs/build_verb.c
 
     src/thirdparty/stb_ds.c
-
-    # These are all the command verbs
-    src/verbs/build_verb.c
-    include/common/utility.h # This is what builds
 )
 
 target_include_directories(calculus PRIVATE include)

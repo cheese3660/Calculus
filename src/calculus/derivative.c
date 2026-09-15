@@ -3,7 +3,7 @@
  *  derivative.c
  *  author: Lexi Allen
  *  license: MIT
- *  last updated: 9/14/2026
+ *  last updated: 9/15/2026
  *
  *****************************************************************************/
 
@@ -19,6 +19,8 @@
 #include "calculus/paths.h"
 #include "common/debug.h"
 #include "common/fs.h"
+#include "common/stream.h"
+#include "common/stream_aux.h"
 #include "common/string.h"
 
 static struct
@@ -29,16 +31,42 @@ static struct
 
 static derivative_header_t **requested_derivatives = nullptr;
 
+#define CALC_MAGIC 0x434C4143
+
+static void write_standard_derivative(stream_t stream, uint32_t num_dependencies, derivative_header_t **dependencies, const char *name, const char *build)
+{
+    if (sm_w32(stream, CALC_MAGIC) == STREAM_ERRORED)
+        panic("Error writing derivative header to stream: %s", sm_error(stream));
+    if (sm_w32(stream, DT_STANDARD) == STREAM_ERRORED)
+        panic("Error writing derivative type to stream: %s", sm_error(stream));
+    if (sm_wcstr(stream, name) == STREAM_ERRORED)
+        panic("Error writing derivative name to stream: %s", sm_error(stream));
+
+    if (sm_w32(stream, num_dependencies) == STREAM_ERRORED)
+        panic("Error writing dependency count to stream: %s", sm_error(stream));
+
+    for (uint32_t i = 0; i < num_dependencies; i++)
+    {
+        if (sm_wsha(stream, dependencies[i]->dhash) == STREAM_ERRORED)
+            panic("Error writing dependency hash to stream: %s", sm_error(stream));
+    }
+
+    if (sm_wcstr(stream, build) == STREAM_ERRORED)
+        panic("Error writing derivative build script to stream: %s", sm_error(stream));
+}
 
 standard_derivative_t *create_standard_derivative(
-    size_t num_dependencies,
+    uint32_t num_dependencies,
     derivative_header_t **dependencies,
     const char *name,
     const char *build)
 {
-    string_t *recipe = get_standard_derivative_recipe(num_dependencies, dependencies, name, build);
-    sha256_t hash = sha256_hash(recipe->cstring, recipe->length);
-    s_free(recipe);
+    void *buffer = nullptr;
+    size_t buffer_len = 0;
+    stream_t memstream = sm_memwrite(&buffer, &buffer_len);
+    write_standard_derivative(memstream, num_dependencies, dependencies, name, build);
+    sha256_t hash = sha256_hash(buffer, buffer_len);
+    sm_close(memstream);
 
     derivative_header_t *preexisting = hmget(registered_derivatives, hash);
     if (preexisting != nullptr)
@@ -62,12 +90,32 @@ standard_derivative_t *create_standard_derivative(
     return result;
 }
 
-fetch_derivative_t *create_fetch_tarball_derivative(
+static void write_fetch_derivative(stream_t stream, const char* url, sha256_t hash, bool extract)
+{
+    if (sm_w32(stream, CALC_MAGIC) == STREAM_ERRORED)
+        panic("Error writing derivative header to stream: %s", sm_error(stream));
+    if (sm_w32(stream, DT_FETCH) == STREAM_ERRORED)
+        panic("Error writing derivative type to stream: %s", sm_error(stream));
+    if (sm_wcstr(stream, url) == STREAM_ERRORED)
+        panic("Error writing fetch file to stream: %s", sm_error(stream));
+    if (sm_wsha(stream, hash) == STREAM_ERRORED)
+        panic("Error writing fetch hash to stream: %s", sm_error(stream));
+    if (sm_w8(stream, extract ? 0xFF : 0x00) == STREAM_ERRORED)
+        panic("Error writing extract flag to stream: %s", sm_error(stream));
+}
+
+fetch_derivative_t *create_fetch_derivative(
     const char *url,
     const char *hash,
     bool extract)
 {
-    sha256_t tarball_sha = hex_to_sha256(hash);
+    sha256_t file_sha = hex_to_sha256(hash);
+    void *buffer = nullptr;
+    size_t buffer_len = 0;
+    stream_t memstream = sm_memwrite(&buffer, &buffer_len);
+    write_fetch_derivative(memstream, url, file_sha, extract);
+    sha256_t sha = sha256_hash(buffer, buffer_len);
+    sm_close(memstream);
 
     derivative_header_t *preexisting = hmget(registered_derivatives, sha);
 
@@ -75,20 +123,18 @@ fetch_derivative_t *create_fetch_tarball_derivative(
     {
         // Sanity check
         if (preexisting->dtype != DT_FETCH)
-            panic("possible hash collision detected evaluating derivative for tarball %s, hash %s", url, sha256_to_hex(&sha));
-        if (((fetch_tarball_derivative_t *)preexisting)->extract != extract)
-            return nullptr; // TODO: add error message here
+            panic("possible hash collision detected evaluating derivative for tarball %s, hash %s", url, hash);
 
-        return (fetch_tarball_derivative_t *)preexisting;
+        return (fetch_derivative_t*)preexisting;
     }
 
-    fetch_tarball_derivative_t *result = malloc(sizeof(fetch_tarball_derivative_t));
+    fetch_derivative_t *result = malloc(sizeof(fetch_derivative_t));
     result->dheader = (derivative_header_t){
-        DT_FETCH_TARBALL,
+        DT_STANDARD,
         sha};
     result->url = strdup(url);
+    result->filehash = file_sha;
     result->extract = extract;
-
     hmput(registered_derivatives, sha, (derivative_header_t *)result);
     return result;
 }
@@ -134,7 +180,7 @@ static void add_str(derivative_header_t *derivative)
     case DT_STANDARD:
         snprintf(path_buf + str_offset, 256 - str_offset, "%s-%s", sha256_to_hex(&derivative->dhash), ((standard_derivative_t *)derivative)->name);
         break;
-    case DT_FETCH_TARBALL:
+    case DT_FETCH:
         snprintf(path_buf + str_offset, 256 - str_offset, "%s", sha256_to_hex(&derivative->dhash));
         break;
     default:

@@ -3,7 +3,7 @@
  *  luaenv.c
  *  author: Lexi Allen
  *  license: MIT
- *  last updated: 9/13/2026
+ *  last updated: 9/15/2026
  *
  *  This contains the implementation of the calculus lua environment, all the
  *  functions that it uses, and how it resolves paths
@@ -872,7 +872,7 @@ static int fetch(lua_State *L)
     {
         extract = lua_toboolean(L, -1);
     }
-    fetch_tarball_derivative_t *drv = create_fetch_tarball_derivative(url, hash, extract);
+    fetch_derivative_t *drv = create_fetch_derivative(url, hash, extract);
 
     if (drv == nullptr)
         luaL_error(L, "fetch failed to create derivative (likely due to the same file being told extract and not)");

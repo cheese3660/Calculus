@@ -3,7 +3,7 @@
  *  derivative.h
  *  author: Lexi Allen
  *  license: MIT
- *  last updated: 9/14/2026
+ *  last updated: 9/15/2026
  * 
  *  This file defines all the derivatives that the 
  *
@@ -41,7 +41,7 @@ typedef struct
     derivative_header_t dheader;
     // These are all the build inputs used to make this derivative, order matters here as it does change the environment variables if changed
     // The order here defines the order of the $DEPS environment variable, which will affect the order of the $PATH environment variable as well
-    size_t num_dependencies;
+    uint32_t num_dependencies;
     derivative_header_t **dependencies;
     // This is what goes after the hash- part, a name for the derivative, and the name that is used when constructing the $DEP_... environment variable in the build scripts
     char *name;
@@ -56,7 +56,7 @@ typedef struct
 /// @param build The build script that actually builds the derivative will be strdup'd
 /// @return A derivative recipe for the given derivative
 standard_derivative_t *create_standard_derivative(
-    size_t num_dependencies,
+    uint32_t num_dependencies,
     derivative_header_t **dependencies,
     const char *name,
     const char *build);
