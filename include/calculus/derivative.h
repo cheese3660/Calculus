@@ -3,7 +3,9 @@
  *  derivative.h
  *  author: Lexi Allen
  *  license: MIT
- *  last updated: 9/13/2026
+ *  last updated: 9/14/2026
+ * 
+ *  This file defines all the derivatives that the 
  *
  *****************************************************************************/
 
@@ -24,7 +26,7 @@ typedef enum
     // The standard type of derivation
     DT_STANDARD,
     // Used for derivations that fetch a tarball
-    DT_FETCH_TARBALL,
+    DT_FETCH,
     // Other types will go here later but this is what is needed for right now
 } derivative_type_t;
 
@@ -59,23 +61,22 @@ standard_derivative_t *create_standard_derivative(
     const char *name,
     const char *build);
 
-// Tarballs don't have a name, they are always created as a file with the <hash> in the store
+// Fetches have 2 hashes, one is the hash of the actual derivative, the second is the hash of the downloaded file
 // when extract is set to true they are then automatically extracted into a folder named <hash> in the store instead
-//
-// This allows for 2 tarballs with the same hash downloaded from 2 different sources to become one, as these are content addressed
 typedef struct
 {
     derivative_header_t dheader;
+    sha256_t filehash;
     char *url;
     bool extract;
-} fetch_tarball_derivative_t;
+} fetch_derivative_t;
 
-/// @brief Create a tarball derivative recipe (or return one if it already exists)
+/// @brief Create a fetch derivative recipe (or return one if it already exists)
 /// @param url The url of the tarball to download
 /// @param hash The expected SHA256 sum of the tarball as a hex string
-/// @param extract Whether the tarball should be pre-extracted to a folder - this almost certainly should only be used for the bootstrap tarball
-/// @return A derivative recipe to download the given tarball
-fetch_tarball_derivative_t *create_fetch_tarball_derivative(
+/// @param extract Whether the file should be treated as an archive pre-extracted to a folder - this almost certainly should only be used for the bootstrap tarball
+/// @return A derivative recipe to download the given file
+fetch_derivative_t *create_fetch_derivative(
     const char *url,
     const char *hash,
     bool extract);
@@ -123,12 +124,12 @@ void buildstack_free(derivative_header_t** stack);
 /// @param recipe The derivative to write to the file
 /// @param file The file to write to
 /// @return 0 on success, negative on failure
-int derivative_write_recipe(derivative_header_t* recipe, FILE* file);
+int derivative_write_recipe(derivative_header_t* recipe, const char* path);
 
 /// @brief Read a derivative from a given file
 /// @param file The file
 /// @return The newly allocated or interned derivative read from the file, nullptr if it fails
-derivative_header_t *derivative_read_recipe(FILE *file);
+derivative_header_t *derivative_read_recipe(const char* path);
 
 /// @brief Dump the entire cookbook to the recipes folder
 /// @return 0 on success, negative on failure
