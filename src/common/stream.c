@@ -170,7 +170,7 @@ static ssize_t mw_write(stream_t stream, const void *buffer, size_t buffer_size)
         }
     }
 
-    memcpy(((uint8_t *)mstream->buffer) + *mstream->cursor, buffer, buffer_size);
+    memcpy(((uint8_t *)*mstream->buffer) + *mstream->cursor, buffer, buffer_size);
     *mstream->cursor += buffer_size;
     return (ssize_t)buffer_size;
 }

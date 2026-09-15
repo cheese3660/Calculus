@@ -49,6 +49,8 @@ enum stream_status sm_rsha(stream_t stream, sha256_t *hash, bool *truncated)
 
 enum stream_status sm_rstr(stream_t stream, string_t *str, bool *truncated)
 {
+    if (truncated)
+        *truncated = false;
     uint32_t len;
     bool len_truncated;
     if (sm_r32(stream, &len, &len_truncated) == STREAM_ERRORED)
@@ -68,7 +70,7 @@ enum stream_status sm_rstr(stream_t stream, string_t *str, bool *truncated)
         s_free(str);
         return stream->status;
     }
-    if (read != sizeof(len) && truncated)
+    if (read != len && truncated)
         *truncated = true;
     str->length = (uint32_t)read;
     str->cstring[str->length] = 0;
@@ -77,7 +79,9 @@ enum stream_status sm_rstr(stream_t stream, string_t *str, bool *truncated)
 
 enum stream_status sm_rcstr(stream_t stream, char **str, bool *truncated)
 {
-
+    if (truncated)
+        *truncated = false;
+        
     uint32_t len;
     bool len_truncated;
     if (sm_r32(stream, &len, &len_truncated) == STREAM_ERRORED)
@@ -90,7 +94,7 @@ enum stream_status sm_rcstr(stream_t stream, char **str, bool *truncated)
         return stream->status;
     }
 
-    *str = malloc(len);
+    *str = malloc(len + 1);
     if (*str == nullptr)
         panic("error allocating buffer to read string into: %s", strerror(errno));
 
@@ -100,6 +104,10 @@ enum stream_status sm_rcstr(stream_t stream, char **str, bool *truncated)
         free(*str);
         return stream->status;
     }
+
+    if (read != len && truncated)
+        *truncated = true;
+        
     (*str)[read] = 0;
     return stream->status;
 }
