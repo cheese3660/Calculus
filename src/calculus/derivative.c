@@ -269,3 +269,9 @@ void buildstack_free(derivative_header_t **stack)
 {
     arrfree(stack);
 }
+
+derivative_header_t *derivative_read_recipe(const char *path)
+{
+    (void)path;
+    return nullptr;
+}

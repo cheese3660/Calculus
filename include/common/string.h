@@ -36,8 +36,8 @@ typedef struct string
     // cannot under any circumstances be resized or freed, which allows for
     // easy owning of the string
     struct string_allocator *allocator;
-    uint32_t length;
-    uint32_t capacity;
+    int32_t length;
+    int32_t capacity;
     // This always has a null byte at the end to be able to efficiently convert
     // to C functions that need it
     char *cstring;
@@ -73,12 +73,12 @@ void s_pool_unmark(uint64_t mark);
 /// @brief Allocate a new string with a given capacity
 /// @param capacity The initial capacity, use STRING_DEFAULT_CAPACITY if you don't know what to use
 /// @return A newly allocated string
-string_t s_new_a(uint32_t capacity) __attribute__((warn_unused_result));
+string_t s_new_a(int32_t capacity) __attribute__((warn_unused_result));
 
 /// @brief Take a string with the given capacity from the string pool
 /// @param capacity The initial capacity, use STRING_DEFAULT_CAPACITY if you don't know what to use
 /// @return A string taken from the string pool
-string_t *s_new_p(uint32_t capacity) __attribute__((returns_nonnull, warn_unused_result));
+string_t *s_new_p(int32_t capacity) __attribute__((returns_nonnull, warn_unused_result));
 
 /// @brief Take ownership of a string, reallocating it
 /// @param original The string to take ownership of
@@ -94,13 +94,13 @@ string_t *s_own_p(const char *original) __attribute__((access(read_only, 1), non
 /// @param original The string to take ownership of
 /// @param len The original string length,
 /// @return A string that contains `original`
-string_t s_ownl_a(const char *original, uint32_t len) __attribute__((access(read_only, 1, 2), nonnull(1), warn_unused_result));
+string_t s_ownl_a(const char *original, int32_t len) __attribute__((access(read_only, 1, 2), nonnull(1), warn_unused_result));
 
 /// @brief Take ownership of a string, attempting to put it into the string pool instead of reallocating
 /// @param original The string to take ownership of
 /// @param len The original string length,
 /// @return A string that contains `original`
-string_t *s_ownl_p(const char *original, uint32_t len) __attribute__((access(read_only, 1, 2), nonnull(1), returns_nonnull, warn_unused_result));
+string_t *s_ownl_p(const char *original, int32_t len) __attribute__((access(read_only, 1, 2), nonnull(1), returns_nonnull, warn_unused_result));
 
 /// @brief Create a new string via a format string
 /// @param format The format string
@@ -113,7 +113,7 @@ string_t s_fmt_a(const char *format, ...) __attribute__((format(printf, 1, 2), a
 /// @param format The format string
 /// @param ... The format parameters
 /// @return A new string from the string pool with the given format characters
-string_t *s_fmt_p(uint32_t max_len, const char *format, ...) __attribute__((format(printf, 2, 3), access(read_only, 2), nonnull(2), returns_nonnull, warn_unused_result));
+string_t *s_fmt_p(int32_t max_len, const char *format, ...) __attribute__((format(printf, 2, 3), access(read_only, 2), nonnull(2), returns_nonnull, warn_unused_result));
 
 /// @brief Create a view over a string, allowing modification but no reallocating
 /// @param original The string being viewed
@@ -124,13 +124,13 @@ string_t s_view(char *original) __attribute__((access(read_write, 1), nonnull(1)
 /// @param original The string being viewed
 /// @param len The length of the string being viewed (excluding the null terminator)
 /// @return A view unto the string, with a capacity of the string length and no reallocation
-string_t s_viewl(char *original, uint32_t len) __attribute__((access(read_write, 1, 2), nonnull(1), warn_unused_result));
+string_t s_viewl(char *original, int32_t len) __attribute__((access(read_write, 1, 2), nonnull(1), warn_unused_result));
 
 /// @brief Wrap a buffer as a temporary string that cannot be resized
 /// @param buffer The buffer
 /// @param buffer_capacity The capacity of the buffer (including the null terminator)
 /// @return A wrapping of the buffer
-string_t s_wrap(char *buffer, uint32_t buffer_capacity) __attribute__((access(read_write, 1, 2), nonnull(1), warn_unused_result));
+string_t s_wrap(char *buffer, int32_t buffer_capacity) __attribute__((access(read_write, 1, 2), nonnull(1), warn_unused_result));
 
 /// @brief Sets the value of a string to the given string
 /// @param s The string
@@ -141,7 +141,7 @@ void s_set(string_t *s, const char *value) __attribute__((access(read_write, 1),
 /// @param s The string
 /// @param value The given string
 /// @param len The known length
-void s_setl(string_t *s, const char *value, uint32_t len) __attribute__((access(read_write, 1), access(read_only, 2, 3), nonnull(1, 2)));
+void s_setl(string_t *s, const char *value, int32_t len) __attribute__((access(read_write, 1), access(read_only, 2, 3), nonnull(1, 2)));
 
 /// @brief Sets the value of a string to the given string
 /// @param s The string
@@ -159,12 +159,12 @@ void s_setfa(string_t *s, const char *format, ...) __attribute__((format(printf,
 /// @param max_len The maximum length of the formatted string
 /// @param format The format string
 /// @param ... The format arguments
-void s_setfn(string_t *s, uint32_t max_len, const char *format, ...) __attribute__((format(printf, 3, 4), access(read_write, 1), access(read_only, 3), nonnull(1, 3)));
+void s_setfn(string_t *s, int32_t max_len, const char *format, ...) __attribute__((format(printf, 3, 4), access(read_write, 1), access(read_only, 3), nonnull(1, 3)));
 
 /// @brief Make sure the string has the capacity for len bytes
 /// @param s The string
 /// @param len The length to reserve
-void s_reserve(string_t *s, uint32_t len) __attribute__((access(read_write, 1), nonnull(1)));
+void s_reserve(string_t *s, int32_t len) __attribute__((access(read_write, 1), nonnull(1)));
 
 /// @brief Checks if a string starts with a given prefix
 /// @param s The string
@@ -235,7 +235,7 @@ void s_catfa(string_t *s, const char *format, ...) __attribute__((format(printf,
 /// @param max_format The maximum length of the format result
 /// @param format The format string
 /// @param ... The format arguments
-void s_catfn(string_t *s, uint32_t max_format, const char *format, ...) __attribute__((format(printf, 3, 4), access(read_write, 1), access(read_only, 3), nonnull(1, 3)));
+void s_catfn(string_t *s, int32_t max_format, const char *format, ...) __attribute__((format(printf, 3, 4), access(read_write, 1), access(read_only, 3), nonnull(1, 3)));
 
 /// @brief Concatenates s with a format string and returns that (using asprintf internally)
 /// @param s The string
@@ -250,7 +250,7 @@ string_t s_catfa_a(const string_t *s, const char *format, ...) __attribute__((fo
 /// @param format The format string
 /// @param ... The format arguments
 /// @return A newly allocated string that is the result of the concatenation
-string_t s_catfn_a(const string_t *s, uint32_t max_format, const char *format, ...) __attribute__((format(printf, 3, 4), access(read_only, 1), access(read_only, 3), nonnull(1, 3), warn_unused_result));
+string_t s_catfn_a(const string_t *s, int32_t max_format, const char *format, ...) __attribute__((format(printf, 3, 4), access(read_only, 1), access(read_only, 3), nonnull(1, 3), warn_unused_result));
 
 /// @brief Concatenates s with a format string and returns a new string from the string pool (using asprintf internally)
 /// @param s The string
@@ -265,7 +265,7 @@ string_t *s_catfa_p(const string_t *s, const char *format, ...) __attribute__((f
 /// @param format The format string
 /// @param ... The format arguments
 /// @return A new string from the string pool that is the result of the concatenation
-string_t *s_catfn_p(const string_t *s, uint32_t max_format, const char *format, ...) __attribute__((format(printf, 3, 4), access(read_only, 1), access(read_only, 3), nonnull(1, 3), returns_nonnull, warn_unused_result));
+string_t *s_catfn_p(const string_t *s, int32_t max_format, const char *format, ...) __attribute__((format(printf, 3, 4), access(read_only, 1), access(read_only, 3), nonnull(1, 3), returns_nonnull, warn_unused_result));
 
 /// @brief Concatenate addition with s in place
 /// @param s The string
@@ -331,7 +331,7 @@ char *s_take(string_t *s) __attribute__((malloc, access(read_write, 1), nonnull(
 /// @param buffer The buffer to copy into
 /// @param n The capacity of the buffer, must be at least 1 as the result is always null terminated
 /// @return A pointer to a copy of the strings data
-char *s_taken(string_t *s, char *buffer, uint32_t n) __attribute__((access(read_write, 1), access(write_only, 2, 3), nonnull(1, 2), returns_nonnull));
+char *s_taken(string_t *s, char *buffer, int32_t n) __attribute__((access(read_write, 1), access(write_only, 2, 3), nonnull(1, 2), returns_nonnull));
 
 /// @brief Allocates a new string using the current allocator from s->cstring and returns that
 /// @param s The string to copy
@@ -343,7 +343,7 @@ char *s_copy_c(const string_t *s) __attribute__((malloc, access(read_only, 1), n
 /// @param buffer The buffer to copy into
 /// @param n The capacity of the buffer, must be at least 1 as the result is always null terminated
 /// @return The c string of s copied into the buffer
-char *s_copy_cn(const string_t *s, char *buffer, uint32_t n) __attribute__((access(read_only, 1), access(write_only, 2, 3), nonnull(1, 2), returns_nonnull));
+char *s_copy_cn(const string_t *s, char *buffer, int32_t n) __attribute__((access(read_only, 1), access(write_only, 2, 3), nonnull(1, 2), returns_nonnull));
 
 /// @brief Copies a string and allocates it using the current allocator
 /// @param s The string to copy
@@ -405,6 +405,68 @@ string_t s_trimlr_a(const string_t *s, const char *trimmed) __attribute__((acces
 /// @param trimmed The characters to be trimmed
 /// @return The string from the string pool with all the characters trimmed
 string_t *s_trimlr_p(const string_t *s, const char *trimmed) __attribute__((access(read_only, 1), access(read_only, 2), nonnull(1, 2), returns_nonnull, warn_unused_result));
+
+/// @brief Finds the index of needle in a string starting from the left
+/// @param s The string
+/// @param needle The substring to find
+/// @return The index of the first character in the found needle, or -1
+int32_t s_lfind(const string_t *s, const char *needle) __attribute__((pure, access(read_only, 1), access(read_only, 2), nonnull(1, 2)));
+
+/// @brief Finds the index of needle in a string starting from the left
+/// @param s The string
+/// @param needle The substring to find
+/// @return The index of the first character in the found needle, or -1
+int32_t s_lfinds(const string_t *s, const string_t *needle) __attribute__((pure, access(read_only, 1), access(read_only, 2), nonnull(1, 2)));
+
+/// @brief Finds the index of needle in a string starting from the left
+/// @param s The string
+/// @param needle The character
+/// @return The index of the given character or -1
+int32_t s_lfindc(const string_t *s, char needle) __attribute__((pure, access(read_only, 1), nonnull(1)));
+
+/// @brief Finds the index of needle in a string starting from the right
+/// @param s The string
+/// @param needle The substring to find
+/// @return The index of the first character in the found needle, or -1
+int32_t s_rfind(const string_t *s, const char *needle) __attribute__((pure, access(read_only, 1), access(read_only, 2), nonnull(1, 2)));
+
+/// @brief Finds the index of needle in a string starting from the right
+/// @param s The string
+/// @param needle The substring to find
+/// @return The index of the first character in the found needle, or -1
+int32_t s_rfinds(const string_t *s, const string_t *needle) __attribute__((pure, access(read_only, 1), access(read_only, 2), nonnull(1, 2)));
+
+/// @brief Finds the index of needle in a string starting from the right
+/// @param s The string
+/// @param needle The character
+/// @return The index of the given character or -1
+int32_t s_rfindc(const string_t *s, char needle) __attribute__((pure, access(read_only, 1), nonnull(1)));
+
+/// @brief Creates a substring of s from [start,end)
+/// @param s The string
+/// @param start The start index, can be negative
+/// @param end The end index, can be negative
+/// @return A newly allocated string that represents the given substring
+string_t s_sub_a(const string_t *s, int32_t start, int32_t end) __attribute__((access(read_only, 1), nonnull(1)));
+
+/// @brief Creates a substring of s from [start,length)
+/// @param s The string
+/// @param start The start index, can be negative
+/// @return A newly allocated string that represents the given substring
+string_t s_subend_a(const string_t *s, int32_t start) __attribute__((access(read_only, 1), nonnull(1)));
+
+/// @brief Creates a substring of s from [start,end)
+/// @param s The string
+/// @param start The start index, can be negative
+/// @param end The end index, can be negative
+/// @return A string from the string pool that represents the given substring
+string_t *s_sub_p(const string_t *s, int32_t start, int32_t end) __attribute__((access(read_only, 1), nonull(1), returns_nonnull, warn_unused_result()));
+
+/// @brief Creates a substring of s from [start,length)
+/// @param s The string
+/// @param start The start index, can be negative
+/// @return A string from the string pool that represents the given substring
+string_t *s_subend_p(const string_t *s, int32_t start) __attribute__((access(read_only, 1), nonnull(1), returns_nonnull, warn_unused_result));
 
 // Utility macros
 

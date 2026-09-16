@@ -89,7 +89,7 @@ void s_pool_unmark(uint64_t mark)
     used_slots = mark;
 }
 
-string_t s_new_a(uint32_t capacity)
+string_t s_new_a(int32_t capacity)
 {
     // We don't convert capacity to the next power of 2 anymore just so that statically sized strings
     // Don't keep taking a whole lot more memory
@@ -104,7 +104,7 @@ string_t s_new_a(uint32_t capacity)
     return result;
 }
 
-string_t *s_new_p(uint32_t capacity)
+string_t *s_new_p(int32_t capacity)
 {
     size_t index = get_free_pool_index();
 
@@ -140,7 +140,7 @@ string_t *s_own_p(const char *original)
     return s_ownl_p(original, len);
 }
 
-string_t s_ownl_a(const char *original, uint32_t len)
+string_t s_ownl_a(const char *original, int32_t len)
 {
     string_t result = s_new_a(len);
     memcpy(result.cstring, original, len);
@@ -149,7 +149,7 @@ string_t s_ownl_a(const char *original, uint32_t len)
     return result;
 }
 
-string_t *s_ownl_p(const char *original, uint32_t len)
+string_t *s_ownl_p(const char *original, int32_t len)
 {
     string_t *result = s_new_p(len);
     memcpy(result->cstring, original, len);
@@ -173,7 +173,7 @@ string_t s_fmt_a(const char *format, ...)
     return result;
 }
 
-string_t *s_fmt_p(uint32_t max_len, const char *format, ...)
+string_t *s_fmt_p(int32_t max_len, const char *format, ...)
 {
     va_list args;
     va_start(args, format);
@@ -183,7 +183,7 @@ string_t *s_fmt_p(uint32_t max_len, const char *format, ...)
     va_end(args);
     if (len < 0)
         panic("Error creating formatted string: %s", strerror(errno));
-    result->length = min((uint32_t)len, max_len);
+    result->length = min((int32_t)len, max_len);
     return result;
 }
 
@@ -192,7 +192,7 @@ string_t s_view(char *original)
     return s_viewl(original, strlen(original));
 }
 
-string_t s_viewl(char *original, uint32_t len)
+string_t s_viewl(char *original, int32_t len)
 {
     string_t result;
     result.allocator = nullptr;
@@ -202,7 +202,7 @@ string_t s_viewl(char *original, uint32_t len)
     return result;
 }
 
-string_t s_wrap(char *buffer, uint32_t buffer_capacity)
+string_t s_wrap(char *buffer, int32_t buffer_capacity)
 {
     string_t result;
     result.allocator = nullptr;
@@ -218,7 +218,7 @@ void s_set(string_t *s, const char *value)
     s_setl(s, value, strlen(value));
 }
 
-void s_setl(string_t *s, const char *value, uint32_t len)
+void s_setl(string_t *s, const char *value, int32_t len)
 {
     s_reserve(s, len);
     s->length = len;
@@ -245,7 +245,7 @@ void s_setfa(string_t *s, const char *format, ...)
     free(result);
 }
 
-void s_setfn(string_t *s, uint32_t max_len, const char *format, ...)
+void s_setfn(string_t *s, int32_t max_len, const char *format, ...)
 {
     s_reserve(s, max_len);
 
@@ -255,10 +255,10 @@ void s_setfn(string_t *s, uint32_t max_len, const char *format, ...)
     va_end(args);
     if (len < 0)
         panic("Error formatting string: %s", strerror(errno));
-    s->length = min((uint32_t)len, max_len);
+    s->length = min((int32_t)len, max_len);
 }
 
-void s_reserve(string_t *s, uint32_t len)
+void s_reserve(string_t *s, int32_t len)
 {
     if (s->capacity >= len)
         return;
@@ -266,7 +266,7 @@ void s_reserve(string_t *s, uint32_t len)
         panic("Attempting to reserve extra space on a string with no allocator!");
 
     // Make sure we are a power of 2
-    len = stdc_bit_ceil(len);
+    len = stdc_bit_ceil((uint32_t)len);
     s->capacity = len;
     s->cstring = s->allocator->alloc(s->cstring, len + 1);
     if (s->cstring == nullptr)
@@ -276,7 +276,7 @@ void s_reserve(string_t *s, uint32_t len)
 bool s_startswith(const string_t *s, const char *prefix)
 {
     // <= so that we get the null byte
-    for (uint32_t i = 0; i <= s->length; i++)
+    for (int32_t i = 0; i <= s->length; i++)
     {
         // In this case we know it to be the case that it does
         if (prefix[i] == 0)
@@ -296,7 +296,7 @@ bool s_startswiths(const string_t *s, const string_t *prefix)
 
 bool s_endswith(const string_t *s, const char *postfix)
 {
-    uint32_t postfix_length = strlen(postfix);
+    int32_t postfix_length = strlen(postfix);
     if (s->length < postfix_length)
         return false;
     return memcmp(s->cstring + s->length - postfix_length, postfix, postfix_length) == 0;
@@ -311,7 +311,7 @@ bool s_endswiths(const string_t *s, const string_t *postfix)
 
 void s_cat(string_t *s, const char *addition)
 {
-    uint32_t addition_len = strlen(addition);
+    int32_t addition_len = strlen(addition);
     s_reserve(s, s->length + addition_len);
     memcpy(s->cstring + s->length, addition, addition_len + 1 /* Null byte */);
     s->length += addition_len;
@@ -319,7 +319,7 @@ void s_cat(string_t *s, const char *addition)
 
 string_t s_cat_a(const string_t *s, const char *addition)
 {
-    uint32_t addition_len = strlen(addition);
+    int32_t addition_len = strlen(addition);
     string_t result = s_new_a(s->length + addition_len);
     memcpy(result.cstring, s->cstring, s->length);
     memcpy(result.cstring + s->length, addition, addition_len + 1 /* Null byte */);
@@ -329,7 +329,7 @@ string_t s_cat_a(const string_t *s, const char *addition)
 
 string_t *s_cat_p(const string_t *s, const char *addition)
 {
-    uint32_t addition_len = strlen(addition);
+    int32_t addition_len = strlen(addition);
     string_t *result = s_new_p(s->length + addition_len);
     memcpy(result->cstring, s->cstring, s->length);
     memcpy(result->cstring + s->length, addition, addition_len + 1 /* Null byte */);
@@ -377,7 +377,7 @@ void s_catfa(string_t *s, const char *format, ...)
     free(result);
 }
 
-void s_catfn(string_t *s, uint32_t max_format, const char *format, ...)
+void s_catfn(string_t *s, int32_t max_format, const char *format, ...)
 {
     s_reserve(s, s->length + max_format);
     va_list args;
@@ -386,7 +386,7 @@ void s_catfn(string_t *s, uint32_t max_format, const char *format, ...)
     va_end(args);
     if (len < 0)
         panic("Error creating formatted string: %s", strerror(errno));
-    s->length += min((uint32_t)len, max_format);
+    s->length += min((int32_t)len, max_format);
 }
 
 string_t s_catfa_a(const string_t *s, const char *format, ...)
@@ -406,7 +406,7 @@ string_t s_catfa_a(const string_t *s, const char *format, ...)
     return result;
 }
 
-string_t s_catfn_a(const string_t *s, uint32_t max_format, const char *format, ...)
+string_t s_catfn_a(const string_t *s, int32_t max_format, const char *format, ...)
 {
     string_t result = s_new_a(s->length + max_format);
     memcpy(result.cstring, s->cstring, s->length);
@@ -416,7 +416,7 @@ string_t s_catfn_a(const string_t *s, uint32_t max_format, const char *format, .
     va_end(args);
     if (len < 0)
         panic("Error creating formatted string: %s", strerror(errno));
-    result.length = s->length + min((uint32_t)len, max_format);
+    result.length = s->length + min((int32_t)len, max_format);
     return result;
 }
 
@@ -437,7 +437,7 @@ string_t *s_catfa_p(const string_t *s, const char *format, ...)
     return result;
 }
 
-string_t *s_catfn_p(const string_t *s, uint32_t max_format, const char *format, ...)
+string_t *s_catfn_p(const string_t *s, int32_t max_format, const char *format, ...)
 {
     string_t *result = s_new_p(s->length + max_format);
     memcpy(result->cstring, s->cstring, s->length);
@@ -447,13 +447,13 @@ string_t *s_catfn_p(const string_t *s, uint32_t max_format, const char *format, 
     va_end(args);
     if (len < 0)
         panic("Error creating formatted string: %s", strerror(errno));
-    result->length = s->length + min((uint32_t)len, max_format);
+    result->length = s->length + min((int32_t)len, max_format);
     return result;
 }
 
 void s_pre(string_t *s, const char *addition)
 {
-    uint32_t addition_len = strlen(addition);
+    int32_t addition_len = strlen(addition);
     s_reserve(s, s->length + addition_len);
     memmove(s->cstring + addition_len, s->cstring, s->length + 1 /* Null byte */);
     memcpy(s->cstring, addition, addition_len);
@@ -462,7 +462,7 @@ void s_pre(string_t *s, const char *addition)
 
 string_t s_pre_a(const string_t *s, const char *addition)
 {
-    uint32_t addition_len = strlen(addition);
+    int32_t addition_len = strlen(addition);
     string_t result = s_new_a(s->length + addition_len);
     memcpy(result.cstring, addition, addition_len);
     memcpy(result.cstring + addition_len, s->cstring, s->length + 1 /* Null byte */);
@@ -472,7 +472,7 @@ string_t s_pre_a(const string_t *s, const char *addition)
 
 string_t *s_pre_p(const string_t *s, const char *addition)
 {
-    uint32_t addition_len = strlen(addition);
+    int32_t addition_len = strlen(addition);
     string_t *result = s_new_p(s->length + addition_len);
     memcpy(result->cstring, addition, addition_len);
     memcpy(result->cstring + addition_len, s->cstring, s->length + 1 /* Null byte */);
@@ -566,9 +566,9 @@ char *s_take(string_t *s)
     return copy;
 }
 
-char *s_taken(string_t *s, char *buffer, uint32_t n)
+char *s_taken(string_t *s, char *buffer, int32_t n)
 {
-    uint32_t n1 = s->length + 1;
+    int32_t n1 = s->length + 1;
     n = n > n1 ? n1 : n;
     memcpy(buffer, s->cstring, n);
     // Make sure it's null terminated
@@ -586,9 +586,9 @@ char *s_copy_c(const string_t *s)
     return copy;
 }
 
-char *s_copy_cn(const string_t *s, char *buffer, uint32_t n)
+char *s_copy_cn(const string_t *s, char *buffer, int32_t n)
 {
-    uint32_t n1 = s->length + 1;
+    int32_t n1 = s->length + 1;
     n = n > n1 ? n1 : n;
     memcpy(buffer, s->cstring, n);
     // Make sure it's null terminated
@@ -612,9 +612,9 @@ string_t *s_copy_p(const string_t *s)
     return copy;
 }
 
-static uint32_t trimr_length(const string_t *s, const char *trimmed)
+static int32_t trimr_length(const string_t *s, const char *trimmed)
 {
-    uint32_t l = s->length;
+    int32_t l = s->length;
     while (l != 0)
     {
         bool found = false;
@@ -640,7 +640,7 @@ void s_trimr(string_t *s, const char *trimmed)
 
 string_t s_trimr_a(const string_t *s, const char *trimmed)
 {
-    uint32_t l = trimr_length(s, trimmed);
+    int32_t l = trimr_length(s, trimmed);
     string_t new = s_new_a(l);
     memcpy(new.cstring, s->cstring, l);
     new.cstring[new.length = l] = 0;
@@ -649,16 +649,16 @@ string_t s_trimr_a(const string_t *s, const char *trimmed)
 
 string_t *s_trimr_p(const string_t *s, const char *trimmed)
 {
-    uint32_t l = trimr_length(s, trimmed);
+    int32_t l = trimr_length(s, trimmed);
     string_t *new = s_new_p(l);
     memcpy(new->cstring, s->cstring, l);
     new->cstring[new->length = l] = 0;
     return new;
 }
 
-static uint32_t triml_offset(const string_t *s, const char *trimmed)
+static int32_t triml_offset(const string_t *s, const char *trimmed)
 {
-    uint32_t o = 0;
+    int32_t o = 0;
     while (o < s->length)
     {
         bool found = false;
@@ -679,14 +679,14 @@ static uint32_t triml_offset(const string_t *s, const char *trimmed)
 
 void s_triml(string_t *s, const char *trimmed)
 {
-    uint32_t o = triml_offset(s, trimmed);
+    int32_t o = triml_offset(s, trimmed);
     memmove(s->cstring, s->cstring + o, (s->length - o) + 1 /* null byte */);
     s->length -= o;
 }
 
 string_t s_triml_a(const string_t *s, const char *trimmed)
 {
-    uint32_t o = triml_offset(s, trimmed);
+    int32_t o = triml_offset(s, trimmed);
     string_t new = s_new_a(s->length - o);
     memcpy(new.cstring, s->cstring + o, (s->length - o) + 1 /* null byte */);
     new.length = s->length - o;
@@ -695,7 +695,7 @@ string_t s_triml_a(const string_t *s, const char *trimmed)
 
 string_t *s_triml_p(const string_t *s, const char *trimmed)
 {
-    uint32_t o = triml_offset(s, trimmed);
+    int32_t o = triml_offset(s, trimmed);
     string_t *new = s_new_p(s->length - o);
     memcpy(new->cstring, s->cstring + o, (s->length - o) + 1 /* null byte */);
     new->length = s->length - o;
@@ -711,8 +711,8 @@ void s_trimlr(string_t *s, const char *trimmed)
 
 string_t s_trimlr_a(const string_t *s, const char *trimmed)
 {
-    uint32_t l = trimr_length(s, trimmed);
-    uint32_t o = triml_offset(s, trimmed);
+    int32_t l = trimr_length(s, trimmed);
+    int32_t o = triml_offset(s, trimmed);
     if (o >= l)
         return s_new_a(0);
     string_t new = s_new_a(l - o);
@@ -723,12 +723,106 @@ string_t s_trimlr_a(const string_t *s, const char *trimmed)
 
 string_t *s_trimlr_p(const string_t *s, const char *trimmed)
 {
-    uint32_t l = trimr_length(s, trimmed);
-    uint32_t o = triml_offset(s, trimmed);
+    int32_t l = trimr_length(s, trimmed);
+    int32_t o = triml_offset(s, trimmed);
     if (o >= l)
         return s_new_p(0);
     string_t *new = s_new_p(l - o);
     memcpy(new->cstring, s->cstring + o, l - o);
     new->cstring[new->length = (l - o)] = 0;
     return new;
+}
+
+inline static int32_t lfindl(const string_t *s, const char *needle, int32_t needle_len)
+{
+    for (int32_t i = 0; i <= s->length - needle_len; i++)
+    {
+        if (memcmp(s->cstring + i, needle, needle_len) == 0)
+            return i;
+    }
+    return -1;
+}
+
+int32_t s_lfind(const string_t *s, const char *needle)
+{
+    return lfindl(s, needle, strlen(needle));
+}
+
+int32_t s_lfinds(const string_t *s, const string_t *needle)
+{
+    return lfindl(s, needle->cstring, needle->length);
+}
+
+int32_t s_lfindc(const string_t *s, char needle)
+{
+    return lfindl(s, &needle, 1);
+}
+
+inline static int32_t rfindl(const string_t *s, const char *needle, int32_t needle_len)
+{
+    for (int32_t i = s->length - needle_len; i >= 0; i--)
+    {
+        if (memcmp(s->cstring + i, needle, needle_len) == 0)
+            return i;
+    }
+    return -1;
+}
+
+int32_t s_rfind(const string_t *s, const char *needle)
+{
+    return rfindl(s, needle, strlen(needle));
+}
+
+int32_t s_rfinds(const string_t *s, const string_t *needle)
+{
+    return rfindl(s, needle->cstring, needle->length);
+}
+
+int32_t s_rfindc(const string_t *s, char needle)
+{
+    return rfindl(s, &needle, 1);
+}
+
+string_t s_sub_a(const string_t *s, int32_t start, int32_t end)
+{
+    if (start < 0)
+        start += s->length;
+    if (end < 0)
+        end += s->length;
+
+    start = max(0, start);
+    end = max(0, end);
+
+    int32_t length = max(0, end - start);
+    string_t result = s_new_a(length);
+    memcpy(result.cstring, s->cstring + start, length);
+    result.cstring[result.length = length] = 0;
+    return result;
+}
+
+string_t s_subend_a(const string_t *s, int32_t start)
+{
+    return s_sub_a(s, start, s->length);
+}
+
+string_t *s_sub_p(const string_t *s, int32_t start, int32_t end)
+{
+    if (start < 0)
+        start += s->length;
+    if (end < 0)
+        end += s->length;
+
+    start = max(0, start);
+    end = max(0, end);
+
+    int32_t length = max(0, end - start);
+    string_t *result = s_new_p(length);
+    memcpy(result->cstring, s->cstring + start, length);
+    result->cstring[result->length = length] = 0;
+    return result;
+}
+
+string_t *s_subend_p(const string_t *s, int32_t start)
+{
+    return s_sub_p(s, start, s->length);
 }

@@ -3,7 +3,7 @@
  *  luaenv.c
  *  author: Lexi Allen
  *  license: MIT
- *  last updated: 9/15/2026
+ *  last updated: 9/16/2026
  *
  *  This contains the implementation of the calculus lua environment, all the
  *  functions that it uses, and how it resolves paths
@@ -109,7 +109,7 @@ static string_t *caller_source(lua_State *L)
 static string_t *caller_directory(lua_State *L)
 {
     string_t *path = caller_source(L);
-    for (uint32_t i = path->length; i > 0; i--)
+    for (int32_t i = path->length; i > 0; i--)
     {
         if (path->cstring[i - 1] == '/')
         {

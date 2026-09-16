@@ -82,6 +82,9 @@ build/
 ### Direnv
 .direnv/
 
+### Zed
+.zed/
+
 ### Vscode
 .vscode/
 
@@ -90,3 +93,6 @@ _utils/
 
 ### Calculus relative path build directoy
 .rel/
+
+### Clangd cache
+.cache/

@@ -28,7 +28,7 @@ enum stream_status sm_wstr(stream_t stream, const string_t *str)
 
 enum stream_status sm_wcstr(stream_t stream, const char *str)
 {
-    uint32_t len = strlen(str);
+    int32_t len = strlen(str);
     if (sm_w32(stream, len) != STREAM_OK)
         return stream->status;
     (void)sm_write(stream, str, len);
@@ -72,7 +72,7 @@ enum stream_status sm_rstr(stream_t stream, string_t *str, bool *truncated)
     }
     if (read != len && truncated)
         *truncated = true;
-    str->length = (uint32_t)read;
+    str->length = (int32_t)read;
     str->cstring[str->length] = 0;
     return stream->status;
 }
