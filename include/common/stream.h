@@ -3,7 +3,7 @@
  *  stream.h
  *  author: Lexi Allen
  *  license: MIT
- *  last updated: 9/15/2026
+ *  last updated: 9/16/2026
  *
  *  Generic data stream library, can be used to read/write data from a "stream"
  *  of data, like a file or memory
@@ -17,7 +17,6 @@
 #include <stdlib.h>
 
 #include <sys/types.h>
-
 
 struct stream_header;
 
@@ -132,25 +131,25 @@ enum stream_status sm_w64(stream_t stream, uint64_t u64) __attribute__((access(r
 /// @param u8 An out parameter for the 8 bit number
 /// @param truncated An out parameter for whether or not the read was truncated, can be nullptr
 /// @return The new status of the stream after the call
-enum stream_status sm_r8(stream_t stream, uint8_t *u8, bool* truncated) __attribute__((access(read_write, 1), access(write_only, 2), access(write_only, 3), nonnull(1, 2)));
+enum stream_status sm_r8(stream_t stream, uint8_t *u8, bool *truncated) __attribute__((access(read_write, 1), access(write_only, 2), access(write_only, 3), nonnull(1, 2)));
 
 /// @brief Read a 16 bit number from the stream
 /// @param stream The stream to read the number from
 /// @param u16 An out parameter for the 16 bit number
 /// @param truncated An out parameter for whether or not the read was truncated, can be nullptr
 /// @return The new status of the stream after the call
-enum stream_status sm_r16(stream_t stream, uint16_t *u16, bool* truncated) __attribute__((access(read_write, 1), access(write_only, 2), access(write_only, 3), nonnull(1, 2)));
+enum stream_status sm_r16(stream_t stream, uint16_t *u16, bool *truncated) __attribute__((access(read_write, 1), access(write_only, 2), access(write_only, 3), nonnull(1, 2)));
 
 /// @brief Read a 32 bit number from the stream
 /// @param stream The stream to read the number from
 /// @param u32 An out parameter for the 32 bit number
 /// @param truncated An out parameter for whether or not the read was truncated, can be nullptr
 /// @return The new status of the stream after the call
-enum stream_status sm_r32(stream_t stream, uint32_t *u32, bool* truncated) __attribute__((access(read_write, 1), access(write_only, 2), access(write_only, 3), nonnull(1, 2)));
+enum stream_status sm_r32(stream_t stream, uint32_t *u32, bool *truncated) __attribute__((access(read_write, 1), access(write_only, 2), access(write_only, 3), nonnull(1, 2)));
 
 /// @brief Read a 64 bit number from the stream
 /// @param stream The stream to read the number from
 /// @param u64 An out parameter for the 64 bit number
 /// @param truncated An out parameter for whether or not the read was truncated, can be nullptr
 /// @return The new status of the stream after the call
-enum stream_status sm_r64(stream_t stream, uint64_t *u64, bool* truncated) __attribute__((access(read_write, 1), access(write_only, 2), access(write_only, 3), nonnull(1, 2)));
+enum stream_status sm_r64(stream_t stream, uint64_t *u64, bool *truncated) __attribute__((access(read_write, 1), access(write_only, 2), access(write_only, 3), nonnull(1, 2)));

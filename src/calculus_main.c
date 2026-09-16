@@ -3,7 +3,7 @@
  *  calculus_main.c
  *  author: Lexi Allen
  *  license: MIT
- *  last updated: 9/15/2026
+ *  last updated: 9/16/2026
  *
  *****************************************************************************/
 
@@ -37,9 +37,9 @@
         printf("SHA256('" X "') = %s\n", sha256_to_hex(&x)); \
     } while (0)
 
-void mermaid(FILE* output, derivative_header_t** wanted, size_t len);
+void mermaid(FILE *output, derivative_header_t **wanted, size_t len);
 
-int main(int argc, const char** argv)
+int main(int argc, const char **argv)
 {
     // Let's make sure we have no umask issues
     umask(0);
@@ -61,7 +61,7 @@ int main(int argc, const char** argv)
     env_teardown();
 
     size_t len;
-    derivative_header_t** derivs = get_requested_derivatives(&len);
+    derivative_header_t **derivs = get_requested_derivatives(&len);
 
     printf("Requested %ld derivatives\n", len);
     for (size_t i = 0; i < len; i++)
@@ -69,15 +69,15 @@ int main(int argc, const char** argv)
         printf("- %s\n", get_derivative_store_path(derivs[i]));
     }
 
-    FILE* merm = fopen("mermaid.txt", "w+");
+    FILE *merm = fopen("mermaid.txt", "w+");
     mermaid(merm, derivs, len);
     fclose(merm);
     printf("Mermaid diagram of build graph is at mermaid.txt\n");
 
-    derivative_header_t** stack = get_buildstack(derivs, len);
+    derivative_header_t **stack = get_buildstack(derivs, len);
     printf("Integrating %ld derivatives to achieve goal\n", buildstack_len(stack));
     size_t i2 = 0;
-    for (derivative_header_t* deriv = buildstack_next(stack); deriv != nullptr; deriv = buildstack_next(stack)) 
+    for (derivative_header_t *deriv = buildstack_next(stack); deriv != nullptr; deriv = buildstack_next(stack))
     {
         printf("%ld - %s\n", i2++, get_derivative_store_path(deriv));
         if (build_derivative(deriv))
@@ -87,10 +87,9 @@ int main(int argc, const char** argv)
     buildstack_free(stack);
 }
 
+derivative_header_t **mermaid_visited;
 
-derivative_header_t** mermaid_visited;
-
-void mermaid_step1(FILE* output, derivative_header_t* node)
+void mermaid_step1(FILE *output, derivative_header_t *node)
 {
     for (ssize_t i = 0; i < arrlen(mermaid_visited); i++)
     {
@@ -101,7 +100,7 @@ void mermaid_step1(FILE* output, derivative_header_t* node)
 
     if (node->dtype == DT_STANDARD)
     {
-        standard_derivative_t* n = (standard_derivative_t*)node;
+        standard_derivative_t *n = (standard_derivative_t *)node;
         fprintf(output, "    node_%s[\"%s\"]\n", sha256_to_hex(&node->dhash), n->name);
         for (size_t i = 0; i < n->num_dependencies; i++)
         {
@@ -110,7 +109,7 @@ void mermaid_step1(FILE* output, derivative_header_t* node)
     }
     else if (node->dtype == DT_FETCH)
     {
-        fetch_derivative_t *n = (fetch_derivative_t*)node;
+        fetch_derivative_t *n = (fetch_derivative_t *)node;
         fprintf(output, "    node_%s[\"%s\"]\n", sha256_to_hex(&node->dhash), n->url);
     }
     else
@@ -119,7 +118,7 @@ void mermaid_step1(FILE* output, derivative_header_t* node)
     }
 }
 
-void mermaid_step2(FILE* output, derivative_header_t* node)
+void mermaid_step2(FILE *output, derivative_header_t *node)
 {
     for (ssize_t i = 0; i < arrlen(mermaid_visited); i++)
     {
@@ -130,11 +129,11 @@ void mermaid_step2(FILE* output, derivative_header_t* node)
 
     if (node->dtype == DT_STANDARD)
     {
-        standard_derivative_t* n = (standard_derivative_t*)node;
-        char* hash = strdup(sha256_to_hex(&node->dhash));
+        standard_derivative_t *n = (standard_derivative_t *)node;
+        char *hash = strdup(sha256_to_hex(&node->dhash));
         for (size_t i = 0; i < n->num_dependencies; i++)
         {
-            fprintf(output, "    node_%s --> node_%s\n", sha256_to_hex(&n->dependencies[i]->dhash),hash);
+            fprintf(output, "    node_%s --> node_%s\n", sha256_to_hex(&n->dependencies[i]->dhash), hash);
             mermaid_step2(output, n->dependencies[i]);
         }
         free(hash);
@@ -150,7 +149,7 @@ void mermaid_step2(FILE* output, derivative_header_t* node)
 }
 
 // Let's create a mermaid diagram of the build graph
-void mermaid(FILE* output, derivative_header_t** wanted, size_t len)
+void mermaid(FILE *output, derivative_header_t **wanted, size_t len)
 {
     // We write the header out
     fprintf(output, "flowchart TB\n");

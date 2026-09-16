@@ -3,7 +3,7 @@
  *  luaenv.h
  *  author: Lexi Allen
  *  license: MIT
- *  last updated: 9/12/2026
+ *  last updated: 9/16/2026
  *
  *****************************************************************************/
 
@@ -24,7 +24,7 @@ void env_setup();
 
 /// @brief Run a script at a given path, returns whether it succeeded or not
 /// @param path The script to run
-int env_run(const char* path);
+int env_run(const char *path);
 
 /// @brief Teardown a lua environment, nop if nothing is set up
 void env_teardown();

@@ -3,7 +3,7 @@
  *  build.c
  *  author: Lexi Allen
  *  license: MIT
- *  last updated: 9/15/2026
+ *  last updated: 9/16/2026
  *
  *  This file contains the implementation of the sandboxed builder system that
  *  is what takes a derivative recipe and creates its artifact in the store.
@@ -33,7 +33,6 @@
 
 #include "calculus/build.h"
 #include "calculus/paths.h"
-#include "common/archive.h"
 #include "common/debug.h"
 #include "common/fs.h"
 #include "common/string.h"
@@ -246,7 +245,7 @@ static int copy_directory(const char *from_directory, const char *directory)
  *
  *****************************************************************************/
 
-static int fetch(fetch_derivative_t* spec)
+static int fetch(fetch_derivative_t *spec)
 {
     // static char fp_buffer[512 /* We can assume a lot less of a size here because there is a max size on paths*/];
     string_t *filepath = nullptr;
@@ -399,7 +398,7 @@ done:
  * copy_file() - Copy one file stream to another
  * monitor_jail() - Monitors the jail process and prints diagnostics
  * build_standard() - Build a standard derivative using a sandboxed jail
- * 
+ *
  *****************************************************************************/
 
 static void setup_uid_map(uid_t uid, gid_t gid)
@@ -502,7 +501,7 @@ static void mount_dependencies(standard_derivative_t *derivative, string_t *buil
     // Then we go over every dependency
     for (size_t i = 0; i < derivative->num_dependencies; i++)
     {
-        derivative_header_t* dependency = derivative->dependencies[i];
+        derivative_header_t *dependency = derivative->dependencies[i];
         string_t *target = s_cat_p(filename, get_derivative_node_name(dependency));
         string_t *local = s_fmt_p(PATH_MAX, CALCULUS_STORE_DIRECTORY "/%s", get_derivative_node_name(dependency));
         string_t *temp = s_new_p(PATH_MAX);

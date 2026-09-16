@@ -3,7 +3,7 @@
  *  build.h
  *  author: Lexi Allen
  *  license: MIT
- *  last updated: 9/11/2026
+ *  last updated: 9/16/2026
  *
  *****************************************************************************/
 
@@ -14,4 +14,4 @@
 /// @brief Build a derivative
 /// @param to_build The derivative to build
 /// @return 0 if the build succeeds, the build processes error code otherwise, printing a log to stdout and to the log path
-int build_derivative(derivative_header_t* to_build);
+int build_derivative(derivative_header_t *to_build);

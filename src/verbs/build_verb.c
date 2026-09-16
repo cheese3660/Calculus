@@ -3,14 +3,14 @@
  *  build_verb.c
  *  author: Lexi Allen
  *  license: MIT
- *  last updated: 9/13/2026
+ *  last updated: 9/16/2026
  *
  *  Implements the `calculus build` command which builds either the requested
  *  set when given a `.lua` file, or builds a specific derivation recipe when
- *  given a bare file without the lua extension, if that derivation recipe is 
- *  not already in the calculus cookbook `/calc/recipes` then it will copy it 
- *  in there and index it into the state database beforehand, otherwise 
- * 
+ *  given a bare file without the lua extension, if that derivation recipe is
+ *  not already in the calculus cookbook `/calc/recipes` then it will copy it
+ *  in there and index it into the state database beforehand, otherwise
+ *
  *****************************************************************************/
 
 #include <stdio.h>
@@ -22,7 +22,7 @@
 #include "calculus/luaenv.h"
 #include "common/string.h"
 
-static const char* optstring = "";
+static const char *optstring = "";
 
 void usage()
 {
@@ -33,12 +33,10 @@ void usage()
     exit(EXIT_FAILURE);
 }
 
-
 static const string_t postfix_lua = S(".lua");
 static const string_t postfix_recipe = S(".recipe");
 
-
-int build_verb(int argc, char** argv)
+int build_verb(int argc, char **argv)
 {
     char opt;
     while ((opt = getopt(argc, argv, optstring)) != -1)
@@ -50,7 +48,6 @@ int build_verb(int argc, char** argv)
         usage();
     }
 
-    
     // Now we need to get every single string from the the arguments
     env_setup();
     for (int arg = optind; arg < argc; arg++)
@@ -63,7 +60,6 @@ int build_verb(int argc, char** argv)
         if (s_endswiths(&view, &postfix_recipe))
         {
             // We request a derivative here
-            
         }
     }
     env_teardown();

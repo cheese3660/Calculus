@@ -3,8 +3,8 @@
  *  crypto.c
  *  author: Lexi Allen
  *  license: MIT
- *  last updated: 9/12/2026
- * 
+ *  last updated: 9/16/2026
+ *
  *  Hand rolled implementation of SHA256 hashing
  *
  *****************************************************************************/
@@ -44,7 +44,7 @@ sha256_t sha256_hash(const void *data, size_t len)
     return sha256_finalize(&ingest);
 }
 
-sha256_t sha256_hashf(FILE* file)
+sha256_t sha256_hashf(FILE *file)
 {
     sha256_ingest_t ingest = {};
     sha256_appendf(&ingest, file);
@@ -71,19 +71,24 @@ const char *sha256_to_hex(sha256_t *hash)
     return hex_digest;
 }
 
-static uint32_t hex_char_to_int(char c) {
-    if (c >= '0' && c <= '9') {
+static uint32_t hex_char_to_int(char c)
+{
+    if (c >= '0' && c <= '9')
+    {
         return c - '0';
-    } else if (c >= 'a' && c <= 'f') {
+    }
+    else if (c >= 'a' && c <= 'f')
+    {
         return c - 'a' + 10;
-    } else if (c >= 'A' && c <= 'F') {
+    }
+    else if (c >= 'A' && c <= 'F')
+    {
         return c - 'A' + 10;
     }
     return (uint32_t)-1;
 }
 
-
-sha256_t hex_to_sha256(const char* hex)
+sha256_t hex_to_sha256(const char *hex)
 {
     if (strlen(hex) != 64)
         panic("hex_to_sha256 given invalid string: %s", hex);
@@ -97,15 +102,13 @@ sha256_t hex_to_sha256(const char* hex)
             uint32_t nibble = hex_char_to_int(hex[i * 8 + j]);
             if (nibble == (uint32_t)-1)
                 panic("hex_to_sha256 given invalid string: %s", hex);
-            
+
             val = (val << 4) | nibble;
         }
         result.h[i] = val;
     }
     return result;
 }
-
-
 
 const char *sha256_to_b64(sha256_t *hash)
 {
@@ -230,7 +233,8 @@ void sha256_appendf(sha256_ingest_t *ingest, FILE *file)
     while (!feof(file))
     {
         size_t read = fread(buffer, 1, 4096, file);
-        if (read != 4096 && ferror(file)) {
+        if (read != 4096 && ferror(file))
+        {
             perror("fread");
             panic("Reading file failed in appendf"); // TODO make this actually return a value
         }

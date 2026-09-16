@@ -3,7 +3,7 @@
  *  gittools.c
  *  author: Lexi Allen
  *  license: MIT
- *  last updated: 9/12/2026
+ *  last updated: 9/16/2026
  *
  *****************************************************************************/
 
@@ -14,13 +14,13 @@
 #include "common/string.h"
 
 static char error_msg[256];
-const char* stored_git_error = "OK";
+const char *stored_git_error = "OK";
 
-int fetch_tag(const char* path, const char* url, const char* tag)
+int fetch_tag(const char *path, const char *url, const char *tag)
 {
     int result;
-    git_repository* repo = nullptr;
-    git_remote* remote = nullptr;
+    git_repository *repo = nullptr;
+    git_remote *remote = nullptr;
     git_object *fetch_head = nullptr;
     string_t *refspec = nullptr;
     git_libgit2_init();
@@ -34,15 +34,15 @@ int fetch_tag(const char* path, const char* url, const char* tag)
 
     refspec = s_fmt_p(512, "refs/tags/%s:refs/tags/%s", tag, tag);
 
-    char* specs_list[] = {refspec->cstring};
+    char *specs_list[] = {refspec->cstring};
 
     git_strarray specs = {};
     specs.strings = specs_list;
     specs.count = 1;
-    
+
     if ((result = git_remote_fetch(remote, &specs, nullptr, nullptr)))
         goto cleanup;
-    
+
     if ((result = git_revparse_single(&fetch_head, repo, "FETCH_HEAD")))
         goto cleanup;
 
@@ -60,20 +60,24 @@ cleanup:
         stored_git_error = error_msg;
     }
 
-    if (refspec) s_free(refspec);
-    if (fetch_head) git_object_free(fetch_head);
-    if (remote) git_remote_free(remote);
-    if (repo) git_repository_free(repo);
+    if (refspec)
+        s_free(refspec);
+    if (fetch_head)
+        git_object_free(fetch_head);
+    if (remote)
+        git_remote_free(remote);
+    if (repo)
+        git_repository_free(repo);
 
     git_libgit2_shutdown();
     return result;
 }
 
-int fetch_sha(const char* path, const char* url, const char* sha)
+int fetch_sha(const char *path, const char *url, const char *sha)
 {
     int result;
-    git_repository* repo = nullptr;
-    git_remote* remote = nullptr;
+    git_repository *repo = nullptr;
+    git_remote *remote = nullptr;
     git_object *fetch_head = nullptr;
     string_t *refspec = nullptr;
     git_libgit2_init();
@@ -86,15 +90,15 @@ int fetch_sha(const char* path, const char* url, const char* sha)
         goto cleanup;
 
     refspec = s_fmt_p(512, "%s:refs/heads/fetch-temp", sha);
-    char* specs_list[] = {refspec->cstring};
+    char *specs_list[] = {refspec->cstring};
 
     git_strarray specs = {};
     specs.strings = specs_list;
     specs.count = 1;
-    
+
     if ((result = git_remote_fetch(remote, &specs, nullptr, nullptr)))
         goto cleanup;
-    
+
     if ((result = git_revparse_single(&fetch_head, repo, "FETCH_HEAD")))
         goto cleanup;
 
@@ -112,10 +116,14 @@ cleanup:
         stored_git_error = error_msg;
     }
 
-    if (refspec) s_free(refspec);
-    if (fetch_head) git_object_free(fetch_head);
-    if (remote) git_remote_free(remote);
-    if (repo) git_repository_free(repo);
+    if (refspec)
+        s_free(refspec);
+    if (fetch_head)
+        git_object_free(fetch_head);
+    if (remote)
+        git_remote_free(remote);
+    if (repo)
+        git_repository_free(repo);
 
     git_libgit2_shutdown();
     return result;

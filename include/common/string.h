@@ -3,7 +3,7 @@
  *  string.h
  *  author: Lexi Allen
  *  license: MIT
- *  last updated: 9/15/2026
+ *  last updated: 9/16/2026
  *
  *  A very basic dynamic string library
  *
@@ -45,8 +45,7 @@ typedef struct string
 
 /// @brief Clear a string, settings its length to 0 and making it's cstring a nullbyte
 /// @param string The string to clear
-__attribute__((access(read_write, 1), nonnull(1)))
-static inline void s_clear(string_t *string)
+__attribute__((access(read_write, 1), nonnull(1))) static inline void s_clear(string_t *string)
 {
     string->cstring[0] = 0;
     string->length = 0;
@@ -412,9 +411,8 @@ string_t *s_trimlr_p(const string_t *s, const char *trimmed) __attribute__((acce
 #define s_stack(BUFFER) (s_wrap(BUFFER, sizeof(BUFFER)))
 #define TRIM_WHITSPACE " \t\n\r\v";
 
-#define S(str) ((string_t){\
-    .allocator = nullptr,\
-    .length = sizeof((str)) - 1,\
-    .capacity = 0,\
-    .cstring = (str)\
-})
+#define S(str) ((string_t){      \
+    .allocator = nullptr,        \
+    .length = sizeof((str)) - 1, \
+    .capacity = 0,               \
+    .cstring = (str)})

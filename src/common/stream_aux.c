@@ -3,7 +3,7 @@
  *  stream_aux.c
  *  author: Lexi Allen
  *  license: MIT
- *  last updated: 9/15/2026
+ *  last updated: 9/16/2026
  *
  *****************************************************************************/
 
@@ -81,7 +81,7 @@ enum stream_status sm_rcstr(stream_t stream, char **str, bool *truncated)
 {
     if (truncated)
         *truncated = false;
-        
+
     uint32_t len;
     bool len_truncated;
     if (sm_r32(stream, &len, &len_truncated) == STREAM_ERRORED)
@@ -107,7 +107,7 @@ enum stream_status sm_rcstr(stream_t stream, char **str, bool *truncated)
 
     if (read != len && truncated)
         *truncated = true;
-        
+
     (*str)[read] = 0;
     return stream->status;
 }

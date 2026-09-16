@@ -3,7 +3,7 @@
  *  paths.h
  *  author: Lexi Allen
  *  license: MIT
- *  last updated: 9/11/2026
+ *  last updated: 9/16/2026
  *
  *****************************************************************************/
 
@@ -17,9 +17,9 @@
 
 // This all will be changed to our actual paths once we actually have them
 #ifdef USE_RELATIVE_PATHS
-    #define CALCULUS_PATH_PREFIX "./.rel/"
+#define CALCULUS_PATH_PREFIX "./.rel/"
 #else
-    #define CALCULUS_PATH_PREFIX "/calc/"
+#define CALCULUS_PATH_PREFIX "/calc/"
 #endif
 
 #define GIT_CACHE_DIRECTORY CALCULUS_PATH_PREFIX "git_cache"
@@ -34,6 +34,5 @@
 // it is updated every single time a derivation recipe is added to the recipe book
 // o
 #define CALCULUS_INDEX_FILE CALCULUS_STATE_DIRECTORY "/index"
-
 
 #define CHROOT_STORE_DIRECTORY CALCULUS_TRUE_PREFIX "str"

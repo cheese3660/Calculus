@@ -3,8 +3,8 @@
  *  fs.c
  *  author: Lexi Allen
  *  license: MIT
- *  last updated: 9/12/2026
- * 
+ *  last updated: 9/16/2026
+ *
  *  Some very basic filesystem abstractions
  *
  *****************************************************************************/
@@ -24,15 +24,13 @@
 #include "common/debug.h"
 #include "common/fs.h"
 
-
-
-bool fs_exists(const char* path)
+bool fs_exists(const char *path)
 {
     struct stat buf;
     return stat(path, &buf) == 0;
 }
 
-bool fs_isdir(const char* path)
+bool fs_isdir(const char *path)
 {
     struct stat buf;
     if (stat(path, &buf) == -1)
@@ -40,7 +38,7 @@ bool fs_isdir(const char* path)
     return S_ISDIR(buf.st_mode);
 }
 
-bool fs_isreg(const char* path)
+bool fs_isreg(const char *path)
 {
     struct stat buf;
     if (stat(path, &buf) == -1)
@@ -48,10 +46,11 @@ bool fs_isreg(const char* path)
     return S_ISREG(buf.st_mode);
 }
 
-int fs_ensure_dir(const char* path)
+int fs_ensure_dir(const char *path)
 {
-    if (!fs_isdir(path)) {
-        const char* command[] = {"mkdir", "-p", path, nullptr};
+    if (!fs_isdir(path))
+    {
+        const char *command[] = {"mkdir", "-p", path, nullptr};
         return command_run(command);
     }
     return 0;

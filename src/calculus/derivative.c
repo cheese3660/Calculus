@@ -3,7 +3,7 @@
  *  derivative.c
  *  author: Lexi Allen
  *  license: MIT
- *  last updated: 9/15/2026
+ *  last updated: 9/16/2026
  *
  *****************************************************************************/
 
@@ -90,7 +90,7 @@ standard_derivative_t *create_standard_derivative(
     return result;
 }
 
-static void write_fetch_derivative(stream_t stream, const char* url, sha256_t hash, bool extract)
+static void write_fetch_derivative(stream_t stream, const char *url, sha256_t hash, bool extract)
 {
     if (sm_w32(stream, CALC_MAGIC) == STREAM_ERRORED)
         panic("Error writing derivative header to stream: %s", sm_error(stream));
@@ -125,7 +125,7 @@ fetch_derivative_t *create_fetch_derivative(
         if (preexisting->dtype != DT_FETCH)
             panic("possible hash collision detected evaluating derivative for tarball %s, hash %s", url, hash);
 
-        return (fetch_derivative_t*)preexisting;
+        return (fetch_derivative_t *)preexisting;
     }
 
     fetch_derivative_t *result = malloc(sizeof(fetch_derivative_t));

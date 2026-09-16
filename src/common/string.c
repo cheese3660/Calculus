@@ -3,7 +3,7 @@
  *  string.c
  *  author: Lexi Allen
  *  license: MIT
- *  last updated: 9/15/2026
+ *  last updated: 9/16/2026
  *
  *  Implementation of a basic dynamic string library with a string pool
  *
@@ -83,12 +83,11 @@ void s_pool_unmark(uint64_t mark)
         size_t index = stdc_trailing_zeros(needs_free);
         s_free(&pool[index]);
         // Clear the lowest bit set
-        needs_free &= needs_free-1;
+        needs_free &= needs_free - 1;
     }
 
     used_slots = mark;
 }
-
 
 string_t s_new_a(uint32_t capacity)
 {
@@ -184,7 +183,7 @@ string_t *s_fmt_p(uint32_t max_len, const char *format, ...)
     va_end(args);
     if (len < 0)
         panic("Error creating formatted string: %s", strerror(errno));
-    result->length = min((uint32_t)len,max_len);
+    result->length = min((uint32_t)len, max_len);
     return result;
 }
 
@@ -256,7 +255,7 @@ void s_setfn(string_t *s, uint32_t max_len, const char *format, ...)
     va_end(args);
     if (len < 0)
         panic("Error formatting string: %s", strerror(errno));
-    s->length = min((uint32_t)len,max_len);
+    s->length = min((uint32_t)len, max_len);
 }
 
 void s_reserve(string_t *s, uint32_t len)
@@ -387,7 +386,7 @@ void s_catfn(string_t *s, uint32_t max_format, const char *format, ...)
     va_end(args);
     if (len < 0)
         panic("Error creating formatted string: %s", strerror(errno));
-    s->length += min((uint32_t)len,max_format);
+    s->length += min((uint32_t)len, max_format);
 }
 
 string_t s_catfa_a(const string_t *s, const char *format, ...)
@@ -417,7 +416,7 @@ string_t s_catfn_a(const string_t *s, uint32_t max_format, const char *format, .
     va_end(args);
     if (len < 0)
         panic("Error creating formatted string: %s", strerror(errno));
-    result.length = s->length + min((uint32_t)len,max_format);
+    result.length = s->length + min((uint32_t)len, max_format);
     return result;
 }
 
@@ -628,7 +627,8 @@ static uint32_t trimr_length(const string_t *s, const char *trimmed)
                 break;
             }
         }
-        if (!found) break;
+        if (!found)
+            break;
     }
     return l;
 }
@@ -671,7 +671,8 @@ static uint32_t triml_offset(const string_t *s, const char *trimmed)
                 break;
             }
         }
-        if (!found) break;
+        if (!found)
+            break;
     }
     return o;
 }

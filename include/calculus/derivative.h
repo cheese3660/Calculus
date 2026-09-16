@@ -3,9 +3,9 @@
  *  derivative.h
  *  author: Lexi Allen
  *  license: MIT
- *  last updated: 9/15/2026
- * 
- *  This file defines all the derivatives that the 
+ *  last updated: 9/16/2026
+ *
+ *  This file defines all the derivatives that the
  *
  *****************************************************************************/
 
@@ -93,12 +93,12 @@ derivative_header_t **get_requested_derivatives(size_t *len);
 /// @brief Get the node name a string
 /// @param derivative The derivative to get the node name
 /// @return A string representing the node name this can get clobbered in successive calls
-const char* get_derivative_node_name(derivative_header_t* derivative);
+const char *get_derivative_node_name(derivative_header_t *derivative);
 
 /// @brief Get the store path as a string
 /// @param derivative The derivative to get the store path of
 /// @return A string representing the store path, this can get clobbered in successive calls
-const char* get_derivative_store_path(derivative_header_t* derivative);
+const char *get_derivative_store_path(derivative_header_t *derivative);
 
 /// @brief Gets the set of derivatives that actually need to be built
 /// @param wanted The wanted set of derivatives
@@ -109,7 +109,7 @@ derivative_header_t **get_buildstack(derivative_header_t **wanted, size_t len);
 /// @brief Get the amount of steps in the build stack
 /// @param stack The stack
 /// @return The length of the build stack
-size_t buildstack_len(derivative_header_t** stack);
+size_t buildstack_len(derivative_header_t **stack);
 
 /// @brief Get the next item from a build stack
 /// @param stack The stack
@@ -118,18 +118,18 @@ derivative_header_t *buildstack_next(derivative_header_t **stack);
 
 /// @brief Free a build stack
 /// @param stack The build stack to free
-void buildstack_free(derivative_header_t** stack);
+void buildstack_free(derivative_header_t **stack);
 
 /// @brief Write a derivative's recipe to a given file
 /// @param recipe The derivative to write to the file
 /// @param file The file to write to
 /// @return 0 on success, negative on failure
-int derivative_write_recipe(derivative_header_t* recipe, const char* path);
+int derivative_write_recipe(derivative_header_t *recipe, const char *path);
 
 /// @brief Read a derivative from a given file
 /// @param file The file
 /// @return The newly allocated or interned derivative read from the file, nullptr if it fails
-derivative_header_t *derivative_read_recipe(const char* path);
+derivative_header_t *derivative_read_recipe(const char *path);
 
 /// @brief Dump the entire cookbook to the recipes folder
 /// @return 0 on success, negative on failure
