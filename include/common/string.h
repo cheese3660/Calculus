@@ -61,6 +61,10 @@ __attribute__((access(read_write, 1), nonnull(1))) static inline void s_clear(st
 /// @param string The string to free
 void s_free(string_t *string) __attribute__((access(read_write, 1), nonnull(1)));
 
+/// @brief Shrink a string such that it's held memory is only that of what it needs
+/// @param string The string to shrink
+void s_shrink(string_t *string) __attribute__((access(read_write, 1), nonnull(1)));
+
 /// @brief Mark this state of the string pool
 /// @return A unique identifier for this state of the stringpool
 /// @warning Do not release strings that were not allocated during a mark/unmark pair
@@ -442,6 +446,59 @@ int32_t s_rfinds(const string_t *s, const string_t *needle) __attribute__((pure,
 /// @return The index of the given character or -1
 int32_t s_rfindc(const string_t *s, char needle) __attribute__((pure, access(read_only, 1), nonnull(1)));
 
+/// @brief Finds the index of needle in a string starting from the left
+/// @param s The string
+/// @param needle The substring to find
+/// @param n The start index, can be negative
+/// @return The index of the first character in the found needle, or -1
+int32_t s_lfindn(const string_t *s, const char *needle, int32_t n) __attribute__((pure, access(read_only, 1), access(read_only, 2), nonnull(1, 2)));
+
+/// @brief Finds the index of needle in a string starting from the left
+/// @param s The string
+/// @param needle The substring to find
+/// @param n The start index, can be negative
+/// @return The index of the first character in the found needle, or -1
+int32_t s_lfindns(const string_t *s, const string_t *needle, int32_t n) __attribute__((pure, access(read_only, 1), access(read_only, 2), nonnull(1, 2)));
+
+/// @brief Finds the index of needle in a string starting from the left
+/// @param s The string
+/// @param needle The character
+/// @param n The start index, can be negative
+/// @return The index of the given character or -1
+int32_t s_lfindnc(const string_t *s, char needle, int32_t n) __attribute__((pure, access(read_only, 1), nonnull(1)));
+
+/// @brief Finds the index of needle in a string starting from the right
+/// @param s The string
+/// @param needle The substring to find
+/// @param n The start index, can be negative
+/// @return The index of the first character in the found needle, or -1
+int32_t s_rfindn(const string_t *s, const char *needle, int32_t n) __attribute__((pure, access(read_only, 1), access(read_only, 2), nonnull(1, 2)));
+
+/// @brief Finds the index of needle in a string starting from the right
+/// @param s The string
+/// @param needle The substring to find
+/// @param n The start index, can be negative
+/// @return The index of the first character in the found needle, or -1
+int32_t s_rfindns(const string_t *s, const string_t *needle, int32_t n) __attribute__((pure, access(read_only, 1), access(read_only, 2), nonnull(1, 2)));
+
+/// @brief Finds the index of needle in a string starting from the right
+/// @param s The string
+/// @param needle The character
+/// @param n The start index, can be negative
+/// @return The index of the given character or -1
+int32_t s_rfindnc(const string_t *s, char needle, int32_t n) __attribute__((pure, access(read_only, 1), nonnull(1)));
+
+/// @brief Substring s from [start,end)
+/// @param s The string
+/// @param start The start index, can be negative
+/// @param end The end index, can be negative
+void s_sub(string_t *s, int32_t start, int32_t end) __attribute__((access(read_write, 1), nonnull(1)));
+
+/// @brief Substring s from [start,length)
+/// @param s The string
+/// @param start The start index, can be negative
+void s_subend(string_t *s, int32_t start) __attribute__((access(read_write, 1), nonnull(1)));
+
 /// @brief Creates a substring of s from [start,end)
 /// @param s The string
 /// @param start The start index, can be negative
@@ -455,18 +512,36 @@ string_t s_sub_a(const string_t *s, int32_t start, int32_t end) __attribute__((a
 /// @return A newly allocated string that represents the given substring
 string_t s_subend_a(const string_t *s, int32_t start) __attribute__((access(read_only, 1), nonnull(1)));
 
+/// @brief Creates a substring of s from [start,length)
+/// @param s The string
+/// @param start The start index, can be negative
+/// @return A C string that points directly to the given substring
+const char *s_subend_c(const string_t *s, int32_t start) __attribute__((pure, access(read_only, 1), nonnull(1), returns_nonnull));
+
 /// @brief Creates a substring of s from [start,end)
 /// @param s The string
 /// @param start The start index, can be negative
 /// @param end The end index, can be negative
 /// @return A string from the string pool that represents the given substring
-string_t *s_sub_p(const string_t *s, int32_t start, int32_t end) __attribute__((access(read_only, 1), nonull(1), returns_nonnull, warn_unused_result()));
+string_t *s_sub_p(const string_t *s, int32_t start, int32_t end) __attribute__((access(read_only, 1), nonnull(1), returns_nonnull, warn_unused_result));
 
 /// @brief Creates a substring of s from [start,length)
 /// @param s The string
 /// @param start The start index, can be negative
 /// @return A string from the string pool that represents the given substring
 string_t *s_subend_p(const string_t *s, int32_t start) __attribute__((access(read_only, 1), nonnull(1), returns_nonnull, warn_unused_result));
+
+/// @brief Compare 2 strings
+/// @param a The first string being compared
+/// @param b The second string being compared
+/// @return a negative number if the first string is less than the second, 0 if they are equal, positive otherwise
+int s_cmp(const string_t *a, const char *b) __attribute__((pure, access(read_only, 1), access(read_only, 2), nonnull(1, 2), warn_unused_result));
+
+/// @brief Compare 2 strings
+/// @param a The first string being compared
+/// @param b The second string being compared
+/// @return a negative number if the first string is less than the second, 0 if they are equal, positive otherwise
+int s_cmps(const string_t *a, const string_t *b) __attribute__((pure, access(read_only, 1), access(read_only, 2), nonnull(1, 2), warn_unused_result));
 
 // Utility macros
 

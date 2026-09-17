@@ -13,13 +13,14 @@ pkg_check_modules(LIBGIT2 REQUIRED IMPORTED_TARGET libgit2)
 pkg_check_modules(LIBARCHIVE REQUIRED IMPORTED_TARGET libarchive)
 pkg_check_modules(LIBCURL REQUIRED IMPORTED_TARGET libcurl)
 
-add_executable(calculus 
+add_executable(calculus
     src/calculus_main.c
 
     src/common/archive.c
     src/common/command.c
     src/common/crypto.c
     src/common/fs.c
+    src/common/path.c
     src/common/stream.c
     src/common/stream_aux.c
     src/common/string.c

@@ -67,6 +67,20 @@ void s_free(string_t *string)
     }
 }
 
+void s_shrink(string_t *string)
+{
+    // We don't shrink strings in the stringpool unless they are too large, otherwise it'd defeat the
+    // point of the stringpool
+    if (string >= &pool[0] && string - &pool[0] < 64 && string->length <= STRINGPOOL_MAX_HELD_CAPACITY)
+        return;
+
+    if (string->allocator != nullptr && string->capacity > string->length)
+    {
+        string->cstring = string->allocator->alloc(string->cstring, string->length + 1);
+        string->capacity = string->length;
+    }
+}
+
 uint64_t s_pool_mark()
 {
     return used_slots;
@@ -783,6 +797,84 @@ int32_t s_rfindc(const string_t *s, char needle)
     return rfindl(s, &needle, 1);
 }
 
+inline static int32_t lfindnl(const string_t *s, const char *needle, int32_t needle_len, int32_t n)
+{
+    if (n < 0)
+        n += s->length;
+    n = max(0, min(n, s->length));
+
+    for (int32_t i = n; i <= s->length - needle_len; i++)
+    {
+        if (memcmp(s->cstring + i, needle, needle_len) == 0)
+            return i;
+    }
+    return -1;
+}
+
+int32_t s_lfindn(const string_t *s, const char *needle, int32_t n)
+{
+    return lfindnl(s, needle, strlen(needle), n);
+}
+
+int32_t s_lfindns(const string_t *s, const string_t *needle, int32_t n)
+{
+    return lfindnl(s, needle->cstring, needle->length, n);
+}
+
+int32_t s_lfindnc(const string_t *s, char needle, int32_t n)
+{
+    return lfindnl(s, &needle, 1, n);
+}
+
+inline static int32_t rfindnl(const string_t *s, const char *needle, int32_t needle_len, int32_t n)
+{
+    if (n < 0)
+        n += s->length;
+    n = max(0, min(n, s->length));
+
+    for (int32_t i = min(n, s->length - needle_len); i >= 0; i--)
+    {
+        if (memcmp(s->cstring + i, needle, needle_len) == 0)
+            return i;
+    }
+    return -1;
+}
+
+int32_t s_rfindn(const string_t *s, const char *needle, int32_t n)
+{
+    return rfindnl(s, needle, strlen(needle), n);
+}
+
+int32_t s_rfindns(const string_t *s, const string_t *needle, int32_t n)
+{
+    return rfindnl(s, needle->cstring, needle->length, n);
+}
+
+int32_t s_rfindnc(const string_t *s, char needle, int32_t n)
+{
+    return rfindnl(s, &needle, 1, n);
+}
+
+void s_sub(string_t *s, int32_t start, int32_t end)
+{
+    if (start < 0)
+        start += s->length;
+    if (end < 0)
+        end += s->length;
+
+    start = max(0, min(start, s->length));
+    end = max(0, min(end, s->length));
+
+    int32_t length = max(0, end - start);
+    memmove(s->cstring, s->cstring + start, length);
+    s->cstring[s->length = length] = 0;
+}
+
+void s_subend(string_t *s, int32_t start)
+{
+    s_sub(s, start, s->length);
+}
+
 string_t s_sub_a(const string_t *s, int32_t start, int32_t end)
 {
     if (start < 0)
@@ -790,8 +882,8 @@ string_t s_sub_a(const string_t *s, int32_t start, int32_t end)
     if (end < 0)
         end += s->length;
 
-    start = max(0, start);
-    end = max(0, end);
+    start = max(0, min(start, s->length));
+    end = max(0, min(end, s->length));
 
     int32_t length = max(0, end - start);
     string_t result = s_new_a(length);
@@ -825,4 +917,29 @@ string_t *s_sub_p(const string_t *s, int32_t start, int32_t end)
 string_t *s_subend_p(const string_t *s, int32_t start)
 {
     return s_sub_p(s, start, s->length);
+}
+
+const char *s_subend_c(const string_t *s, int32_t start)
+{
+    if (start < 0)
+        start += s->length;
+    return s->cstring + max(0, start);
+}
+
+int s_cmp(const string_t *a, const char *b)
+{
+    int32_t len = strlen(b);
+    // Because both are null terminated this becomes a simple memcmp
+    // Assuming 0 is null, and 1-9 are other characters
+    // Then
+    // A = 123123410
+    // B = 12312341324140
+    //  -> 00000000-
+    // So A goes before B
+    return memcmp(a->cstring, b, min(a->length, len) + 1);
+}
+
+int s_cmps(const string_t *a, const string_t *b)
+{
+    return memcmp(a->cstring, b->cstring, min(a->length, b->length) + 1);
 }

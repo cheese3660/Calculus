@@ -123,7 +123,7 @@ void buildstack_free(derivative_header_t **stack);
 /// @brief Read a derivative from a given file
 /// @param file The file
 /// @return The newly allocated or interned derivative read from the file, nullptr if it fails
-/// @details This recursively looks up unregistered recipes from the folder the path is in, then the cookbook if not there & panics if it fails on one
+/// @details This recursively looks up unregistered recipes from the folder the path is in, then the cookbook
 derivative_header_t *derivative_read_recipe(const char *path);
 
 /// @brief Dump the entire cookbook to the recipes folder

@@ -124,7 +124,6 @@ fetch_derivative_t *create_fetch_derivative(
         // Sanity check
         if (preexisting->dtype != DT_FETCH)
             panic("possible hash collision detected evaluating derivative for tarball %s, hash %s", url, hash);
-
         return (fetch_derivative_t *)preexisting;
     }
 
@@ -270,8 +269,169 @@ void buildstack_free(derivative_header_t **stack)
     arrfree(stack);
 }
 
+#define checked_r(N, s, target)                                          \
+    do                                                                   \
+    {                                                                    \
+        if (sm_r##N(s, target, &truncated) == STREAM_ERRORED)            \
+        {                                                                \
+            fprintf(stderr, "failed to read %s: %s", path, sm_error(s)); \
+            goto err;                                                    \
+        }                                                                \
+        if (truncated)                                                   \
+        {                                                                \
+            fprintf(stderr, "unexpected eof in %s", path);               \
+            goto err;                                                    \
+        }                                                                \
+    } while (0)
+
+static string_t cookbook_path = S(CALCULUS_RECIPES_DIRECTORY "/");
+
+static derivative_header_t *read_standard_derivative(const char *path, stream_t s)
+{
+    bool truncated;
+    uint32_t n_dependencies;
+    char *name = nullptr;
+    char *build = nullptr;
+    derivative_header_t **deps = nullptr;
+    string_t pstr = s_new_a(PATH_MAX);
+    pstr.length = strlen(realpath(path, pstr.cstring));
+    int32_t last_slash = s_rfindc(&pstr, '/');
+    if (last_slash < 0)
+        unreachable(); // There should be no way realpath fails here at all
+    s_sub(&pstr, 0, last_slash + 1 /* We want to keep in the last slash for easy cat'ing */);
+    s_shrink(&pstr);
+
+    checked_r(cstr, s, &name);
+
+    checked_r(32, s, &n_dependencies);
+
+    deps = calloc(n_dependencies, sizeof(derivative_header_t *));
+    if (!deps)
+        panic("error allocating dependency array: %s", strerror(errno));
+
+    for (uint32_t i = 0; i < n_dependencies; i++)
+    {
+        sha256_t hash;
+        checked_r(sha, s, &hash);
+        ssize_t preexisting = hmgeti(registered_derivatives, hash);
+        if (preexisting != -1)
+        {
+            deps[i] = registered_derivatives[preexisting].value;
+            continue;
+        }
+
+        string_t test = s_cat_a(&pstr, sha256_to_hex(&hash));
+        s_cat(&test, ".recipe");
+        s_shrink(&test);
+
+        if (fs_exists(test.cstring))
+        {
+            derivative_header_t *to_add = derivative_read_recipe(test.cstring);
+            if (to_add == nullptr)
+            {
+                fprintf(stderr, "error in dependency for %s: %s", path, test.cstring);
+                s_free(&test);
+                goto err;
+            }
+            s_free(&test);
+            continue;
+        }
+        if (s_cmps(&pstr, &cookbook_path) == 0)
+        {
+            s_free(&test);
+            fprintf(stderr, "dependency not found for %s: %s", path, sha256_to_hex(&hash));
+            goto err;
+        }
+
+        s_setl(&test, CALCULUS_RECIPES_DIRECTORY "/", sizeof(CALCULUS_RECIPES_DIRECTORY) /* no -1 because of the / */);
+        s_cat(&test, sha256_to_hex(&hash));
+        s_cat(&test, ".recipe");
+        s_shrink(&test);
+
+        if (!fs_exists(test.cstring))
+        {
+            s_free(&test);
+            fprintf(stderr, "dependency not found for %s: %s", path, sha256_to_hex(&hash));
+            goto err;
+        }
+
+        derivative_header_t *to_add = derivative_read_recipe(test.cstring);
+        if (to_add == nullptr)
+        {
+            fprintf(stderr, "error in dependency for %s: %s", path, test.cstring);
+            s_free(&test);
+            goto err;
+        }
+        s_free(&test);
+    }
+
+    checked_r(cstr, s, &build);
+
+    derivative_header_t *result = create_standard_derivative(n_dependencies, deps, name, build);
+    // Now we validate the hash is in the filename
+
+    s_free(&pstr);
+    free(deps);
+    free(name);
+    free(build);
+    return result;
+err:
+    s_free(&pstr);
+    if (deps)
+        free(deps);
+    if (name)
+        free(name);
+    if (build)
+        free(build);
+    return nullptr;
+}
+
+static derivative_header_t *read_fetch_derivative(const char *path, stream_t s)
+{
+}
+
 derivative_header_t *derivative_read_recipe(const char *path)
 {
-    (void)path;
+    uint32_t magic;
+    bool truncated;
+    uint32_t type;
+    derivative_header_t *result = nullptr;
+    stream_t s = nullptr;
+    FILE *f = fopen(path, "rb");
+    if (f == nullptr)
+    {
+        fprintf(stderr, "failed to open %s: %s", path, strerror(errno));
+        goto err;
+    }
+    // This now owns the file
+    s = sm_file(f);
+
+    checked_r(32, s, &magic);
+    if (magic != CALC_MAGIC)
+    {
+        fprintf(stderr, "incorrect magic number in %s: %x", path, magic);
+        goto err;
+    }
+    checked_r(32, s, &type);
+
+    switch (type)
+    {
+    case DT_STANDARD:
+        result = read_standard_derivative(path, s);
+        break;
+    case DT_FETCH:
+        result = read_fetch_derivative(path, s);
+        break;
+    default:
+        fprintf(stderr, "unknown derivative type in %s: %d", path, type);
+        goto err;
+    }
+
+    sm_close(s);
+    return result;
+
+err:
+    if (s)
+        sm_close(s);
     return nullptr;
 }
